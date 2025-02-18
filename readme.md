@@ -1,38 +1,46 @@
-# Projektarbeit (APL): Automatisierte Imageerstellung für die Forensische Datenanalyse mit Fortrace++
-
-## Inhaltsverzeichnis
-- [Einführung](#einführung)
-- [Aufgabenstellung](#aufgabenstellung)
-- [Installation von Fortrace++](#installation-von-fortrace)
-  - [Windows VM vorbereiten](#windows-vm-vorbereiten)
-- [Szenarien](#szenarien)
-  - [Szenario 1: Leicht – Unbefugter Fernzugang via Backdoor](#szenario-1-leicht--unbefugter-fernzugang-via-backdoor)
-  - [Szenario 2: Mittel – Simulation sicherer Malware / Ransomware-ähnliches Verhalten](#szenario-2-mittel--simulation-sicherer-malware--ransomware-ähnliches-verhalten)
-  - [Szenario 3: Schwer – Komplexer Multi-Stage Angriff und persistente Infektion](#szenario-3-schwer--komplexer-multi-stage-angriff-und-persistente-infektion)
-- [Erwartete Artefakte und Analyse](#erwartete-artefakte-und-analyse)
-- [Zusammenfassung und Fazit](#zusammenfassung-und-fazit)
-
----
-## Einführung
-
-Diese Projektarbeit im Rahmen des Masterstudiums Angewandte Informatik im Modul "Forensische Datenanalyse" beschäftigt sich mit der Erstellung und Analyse von VM-Images unteranderem mithilfe der Open-Source-Software **Fortrace++**. Mithilfe von Python-Skripten und YAML-Konfigurationsscripten werden kontrollierte Szenarien erstellt, die typische Angriffsvektoren und Kompromittierungen abbilden. Das daraus resultierende VM-Image dient unter anderem Bildungszwecken, um forensische Analysen praxisnah zu schulen.
-
-In einfachen Worten: Es werden gezielt Angriffe und Malware-Simulationen in einer virtuellen Umgebung ausgeführt, die anschließend in einer forensischen Analyse (z.B. mittels Autopsy) untersucht werden können.
+# Project Work (APL): Automated Image Creation for Forensic Data Analysis with Fortrace++
+- **main focus**: Malicious and Malware Scenarios, Automation
+## Table of Contents
+- [Introduction](#introduction)
+- [Task Description](#task-description)
+- [Installation of Fortrace++](#installation-of-fortrace)
+  - [Kali Linux](#kali-linux)
+  - [EndeavourOS (Arch Linux)](#endeavouros-arch-linux)
+  - [Preparing the Windows VM](#preparing-the-windows-vm)
+- [Scenarios](#scenarios)
+  - [Scenario 1: Easy – Unauthorized Remote Access via Backdoor](#scenario-1-easy--unauthorized-remote-access-via-backdoor)
+  - [Scenario 2: Medium – Simulation of Secure Malware / Ransomware-like Behavior](#scenario-2-medium--simulation-of-secure-malware--ransomware-like-behavior)
+  - [Scenario 3: Hard – Complex Multi-Stage Attack and Persistent Infection](#scenario-3-hard--complex-multi-stage-attack-and-persistent-infection)
+- [Expected Artifacts and Analysis](#expected-artifacts-and-analysis)
+- [Summary and Conclusion](#summary-and-conclusion)
 
 ---
 
-## Aufgabenstellung
+## Introduction
 
-- **Erstellung eines VM-Images:** Mithilfe von Fortrace++ und Python werden simulierte Angriffsszenarien in einer VM implementiert.
-- **Dokumentation:** Eine ausführliche Beschreibung der einzelnen Szenarien, der technischen Abläufe und der resultierenden Artefakte in Markdown.
-- **Schwerpunkt Automatisierung:** Die Szenarien sollen weitgehend automatisiert erstellt und dokumentiert werden, um den Wiederholungsprozess und die Reproduzierbarkeit zu gewährleisten.
-- **Bildungszwecke:** Das fertige Image soll in der Ausbildung und Forschung genutzt werden, um forensische Analysen zu trainieren.
+This project work, part of the Master's program in Applied Computer Science within the "Forensic Data Analysis" module, focuses on the creation and analysis of VM images using the open-source software **Fortrace++**. Controlled scenarios depicting common attack vectors and system compromises are generated and automated using Python scripts and YAML configuration files. The resulting VM image serves educational purposes, providing practical training in forensic analysis.
+
+In simple terms: Targeted attacks and malware simulations are executed in a virtual environment, which can later be analyzed using forensic tools (e.g., Autopsy, Magnet Axiom).
 
 ---
 
-## Installation von Fortrace++
-- Installationsschritte werden hier nur zur Vollständigkeit dokumentiert. Bei individuellen Installationen und möglicherweise auftretenen Problemen bitte auf der offizielen Dokumentation des Projekts [Fortrace++](https://gitlab.com/DW0lf/fortrace#installation) nachschauen.
-- System dieser Dokumentation:
+## Task Description
+
+- **Creation of a VM Image:** Using Fortrace++ and Python, simulated attack scenarios are automatically performed in a VM.
+- **Documentation:** Detailed description of each scenario, technical procedures, and resulting artifacts in Markdown.
+- **Focus on Automation:** Scenarios should be largely automated for repeatability and reproducibility.
+- **Educational Purpose:** The final image is intended for training and research in forensic analysis.
+
+---
+
+## Installation of Fortrace++
+- Installation steps are documented here for completeness. 
+For individual installations and potential issues, 
+please refer to the official [Fortrace++ documentation](https://gitlab.com/DW0lf/fortrace#installation).
+- I used two Maschines while working on the task (I. Kali Linux, II. EndeavourOS (similar to Arch Linux, the Distro used by the Fortrace++ Project Maintainer))
+
+### Kali Linux
+- System setup for this documentation:
     - OS: Kali GNU/Linux kali-rolling (kali-rolling) x86_64
     - Kernel: 6.11.2-amd64
     - CPU: Intel i7-8700K (12) @ 4.7GHz
@@ -40,7 +48,7 @@ In einfachen Worten: Es werden gezielt Angriffe und Malware-Simulationen in eine
     - Memory: 64 GiB
 ```sh
 git clone https://gitlab.com/DW0lf/fortrace.git
-# Debian (Kali) / Ubuntu 
+# Debian (Kali) / Ubuntu
 sudo apt install qemu-kvm libvirt-daemon-system libvirt-dev python3 python3-dev
 sudo adduser $USER libvirt
 sudo apt install build-essential
@@ -49,11 +57,8 @@ sudo apt install tesseract-ocr tesseract-ocr-eng wireshark-common libguestfs-too
 sudo apt install python3-venv
 ```
 
-**Virtual Environment für Python erstellen**
-- Später wird es laut Roadmap des Projekts auch per GUI funktionieren, aber derzeit (Stand: Februar 2025) ist die Einrichtung noch über Commandline und Python manuell notwendig!
-
-- Run the four commands below in the project's root
-folder to create a new virtual environment named .venv and activate it
+**Create a Virtual Environment for Python**
+- In the future, a GUI setup will be available or is at least planned, but as of February 2025, manual command-line and Python setup is required.
 
 ```sh
 python -m venv .venv
@@ -62,164 +67,140 @@ FILE_SUFFIX=$(python --version | grep -oP '(?<=Python )\d+\.\d+' | sed 's/\./_/g
 pip install -r requirements_lock_$FILE_SUFFIX.txt
 ```
 
-- if you plan to alter the disk image of the VM with ForTrace++ (e.g. for placing files there) install the following dependency
-    - check for the latest version [here](https://download.libguestfs.org/python/)
+- If you plan to modify the VM disk image with ForTrace++ (e.g., to place files there), install the following dependency:
+    - Check for the latest version [here](https://download.libguestfs.org/python/)
     - `pip install http://libguestfs.org/download/python/guestfs-1.40.2.tar.gz`
 
-**Download submodules**
-- the weights for OpenCV's EAST text detection
+**Download Submodules**
 ```
 git submodule init
 git submodule update --force --recursive --init --remote
 ```
 
-**Setup the environment**
+**Setup the Environment**
 ```
 PYTHON_VERSION=$(python --version | grep -oP '(?<=Python )\d+\.\d+')
 readlink -f src > .venv/lib/python$PYTHON_VERSION/site-packages/fortrace_src.pth
 ```
 
 **Usage**
-- refer to official documentation: https://fortrace.readthedocs.io/en/latest/index.html
+- Refer to the official documentation: https://fortrace.readthedocs.io/en/latest/index.html
 
 ---
 
-### Windows VM vorbereiten
-- Download official Win10 .iso from [here](https://www.microsoft.com/en-us/software-download/windows10)
-  - Um Microsofts Schutzmechanismen zu umgehen und auch in Deutschland die englische ISO herunterzuladen sind möglicherweise einige Tricks notwendig.
-  1. Dev-Console im Browser öffnen (F12) --> Geräte-Emulation umschalten auf ein mobiles Device, damit die Download-Option für die ISO erscheint!
-  2. Verwenden vom Microsoft Edge Browser (andere Browser lieferten einen Fehler beim Download, alternativ den User-Agent anpassen im beliebigen Browser der Wahl auf Edge)
-  3. VPN verwenden und einen USA-Standort auswählen (ggf. verschiedene Server ausprobieren bis einer funktioniert!)
+### EndeavourOS (Arch Linux)
 
-- Script `create_vm.sh` zur automatisierten Erstellung der Win10-VM verwenden oder einfach manuell die Schritte aus der [offiziellen Doku](https://gitlab.com/DW0lf/fortrace/-/tree/main/examples/Windows/ForTrace_Workshop/VeraCrypt#installation-of-windows-10-vm) folgen, da die Erstinstallation des Windows OS leider zwangsweise händische Konfigurationen innerhalb der VM benötigt
+
+### Preparing the Windows VM
+- Download the official Win10 .iso from [here](https://www.microsoft.com/en-us/software-download/windows10) (recommended Language: English International)
+  - To bypass Microsoft's restrictions and download the English ISO in Germany, the following tricks may be necessary:
+  1. Open the developer console in your browser (F12) → Switch device emulation to a mobile device to enable the ISO download option.
+  2. Use Microsoft Edge (other browsers may cause download errors, or adjust the user agent to mimic Edge).
+  3. Use a VPN and select a US location (try different servers until one works).
+
+- Use the `create_vm.sh` script for automated Win10 VM creation or manually follow the steps in the [official documentation](https://gitlab.com/DW0lf/fortrace/-/tree/main/examples/Windows/ForTrace_Workshop/VeraCrypt#installation-of-windows-10-vm), as Windows OS initial installation requires manual configuration within the VM.
+
+---
+
+## Scenarios
+
+### Scenario 1: Easy – Unauthorized Remote Access via Backdoor
+
+**Description:**
+
+This scenario simulates a simple case where a laptop is left unattended. An attacker takes the opportunity to set up remote access by installing a backdoor on the system. This backdoor can later be detected in a forensic analysis (e.g., using Autopsy).
+
+**Technical Implementation:**
+
+- **Environment:**  
+  - VM image where the laptop (simulated machine) is operated in an "unattended" state.
+  - Network: Local network allowing remote access.
+- **Execution:**
+  1. **Initial State:** The laptop is powered on but left unattended.
+  2. **Attack:** A script is automatically triggered (via scheduled tasks or other triggers) to establish a remote connection.
+  3. **Backdoor Installation:** A Python-based exploit installs a persistent backdoor (e.g., as a hidden service).
+  4. **Logging:** All actions (connection, installation, system registration) are recorded in log files.
+- **Forensic Artifacts:**
+  - Log entries documenting the time and process of backdoor installation.
+  - System modifications (new services, changed configurations).
+  - Network connections evidencing remote access.
+
+---
+
+### Scenario 2: Medium – Exfiltrate Passwords from the SQLite Database of the Webbrowser
+
 
 
 ---
 
-## Szenarien
+### Scenario 3: Hard - File Encryption (Ransomware-like Behavior)
 
-### Szenario 1: Leicht – Unbefugter Fernzugang via Backdoor
+**Description:**
 
-**Beschreibung:**
+This scenario simulates controlled malware activity resembling a ransomware attack. System files are encrypted, but in a safe test environment to prevent actual damage.
 
-In diesem Szenario wird ein simpler Fall simuliert, bei dem ein Laptop unbeaufsichtigt zurückgelassen wurde. Ein Angreifer nutzt die Gelegenheit, um einen Fernzugang vorzubereiten. Hierbei wird eine Backdoor auf dem System installiert, die in einer späteren forensischen Analyse (z.B. mittels Autopsy) entdeckt werden kann.
+**Technical Implementation:**
 
-**Technische Umsetzung:**
+- **Environment:**  
+  - VM image where special test files and directories are created.
+  - Isolated network to prevent spread.
+- **Execution:**
+  1. **Preparation:** Create a test directory with dummy files.
+  2. **Malware Simulation:** A Python script "encrypts" (simulates encryption of) the files using a simple encryption method (e.g., XOR encryption). All actions are logged.
+  3. **Recovery:** A decryption script is provided to restore test environment integrity.
+- **Forensic Artifacts:**
+  - Log files documenting encryption timestamps and actions.
+  - Changed file attributes and unusual file naming conventions.
+  - Memory traces and temporary files showing malware activity.
 
-- **Umgebung:** 
-  - VM-Image, in dem der Laptop (simulierte Maschine) im "unbeaufsichtigten" Zustand betrieben wird.
-  - Netzwerk: Lokales Netzwerk, in dem Remote-Zugriffe möglich sind.
-- **Ablauf:**
-  1. **Ausgangssituation:** Der Laptop ist eingeschaltet, jedoch unbeaufsichtigt.
-  2. **Angriff:** Ein Skript wird automatisch (über geplante Aufgaben oder Trigger) aktiviert, das eine Remote-Verbindung initialisiert.
-  3. **Installation der Backdoor:** Über einen Python-basierten Exploit wird eine persistente Backdoor installiert (z.B. als versteckter Dienst).
-  4. **Logging:** Alle Aktionen (Verbindung, Installation, Registrierung im System) werden in Logfiles geschrieben.
-- **Forensische Artefakte:**
-  - Logeinträge, die den Zeitpunkt und Ablauf der Backdoor-Installation dokumentieren.
-  - Veränderungen im System (neue Dienste, veränderte Konfigurationen).
-  - Netzwerkverbindungen, die den Remote-Zugriff belegen.
+#### 📌 Description of the script 
+This script encrypts all files and folders in the **"Documents"** directory of the current user.  
+- Encryption is performed using a **XOR operation**.  
+- Filenames are additionally **Base64 encoded** to avoid invalid characters.  
+- At the end, a **"YOU_GOT_HACKED.txt"** file is created on the desktop listing all encrypted files.  
+- A **log file with debug information** is stored in the "Downloads" folder.  
+- The **console window remains hidden** to execute the process in the background.  
 
-
-### Szenario 2: Mittel – Simulation sicherer Malware / Ransomware-ähnliches Verhalten
-
-**Beschreibung:**
-
-Dieses Szenario simuliert den Ablauf einer kontrollierten Malware-Aktivität, die beispielsweise einem Ransomware-Angriff ähnelt. Dabei werden Systemdateien verschlüsselt – allerdings in einer sicheren Testumgebung, sodass keine realen Schäden entstehen.
-
-**Technische Umsetzung:**
-
-- **Umgebung:** 
-  - VM-Image, in dem spezielle Testdateien und -verzeichnisse angelegt werden.
-  - Ein abgeschottetes Netzwerk, um eine Verbreitung zu verhindern.
-- **Ablauf:**
-  1. **Vorbereitung:** Anlegen eines Testverzeichnisses mit Dummy-Dateien.
-  2. **Malware-Simulation:** Ein Python-Skript "verschlüsselt" (simuliert) die Dateien mithilfe einer einfachen Verschlüsselungsmethode (z.B. XOR-Verschlüsselung). Die Aktion wird protokolliert.
-  3. **Wiederherstellbarkeit:** Bereitstellung eines Entschlüsselungs-Skripts, um die Integrität der Testumgebung zu gewährleisten.
-- **Forensische Artefakte:**
-  - Logdateien, die die Zeitpunkte und Aktionen der Verschlüsselung dokumentieren.
-  - Geänderte Dateiattribute und ungewöhnliche Dateinamenskonventionen.
-  - Spuren im Speicher und in temporären Verzeichnissen.
-
----
-
-### Szenario 3: Schwer – Komplexer Multi-Stage Angriff und persistente Infektion
-
-**Beschreibung:**
-
-Das dritte Szenario bildet einen komplexeren Angriff ab, der in mehreren Stufen abläuft. Hierbei wird ein initialer Angriffspunkt genutzt, um sich lateral im System zu bewegen, weitere Malware-Komponenten zu installieren und persistente Mechanismen zu etablieren. Dies soll reale Advanced Persistent Threats (APTs) simulieren.
-
-**Technische Umsetzung:**
-
-- **Umgebung:** 
-  - VM-Image mit mehreren simulierten Netzwerkknoten und unterschiedlichen Benutzerkonten.
-  - Realistische Netzwerkeinstellungen, um laterale Bewegungen zu ermöglichen.
-- **Ablauf:**
-  1. **Initialer Angriff:** Ein Penetrationstest-Skript nutzt eine Schwachstelle in einer öffentlich zugänglichen Dienstleistung (z.B. veralteter SSH-Dienst).
-  2. **Laterale Bewegung:** Nach erfolgreicher Erstanmeldung wird ein Skript gestartet, das weitere Systeme im Netzwerk scannt und kompromittiert.
-  3. **Persistenz:** Installation von Tools, die einen dauerhaften Zugang ermöglichen (z.B. Rootkits, zusätzliche Backdoors).
-  4. **Verschleierung:** Löschen von Spuren und Manipulation von Logdateien.
-- **Forensische Artefakte:**
-  - Mehrstufige Logdateien mit verschiedenen Zeitstempeln, die den Ablauf des Angriffs dokumentieren.
-  - Veränderungen in Systemdateien und Konfigurationen (z.B. veränderte SSH-Konfiguration).
-  - Reste von gelöschten Logdateien und Anzeichen für Manipulation der Systemuhr.
-  - Speicherabbilder, die Hinweise auf laufende Prozesse und persistente Dienste enthalten.
-
----
-
-## Erwartete Artefakte und Analyse
-
-Für alle Szenarien werden folgende Artefakte erwartet:
-
-- **Logdateien:** Detaillierte Protokolle, die den Zeitpunkt, Ablauf und die Art der durchgeführten Aktionen dokumentieren.
-- **Systemveränderungen:** Registrierte Änderungen in Systemkonfigurationen, Dateiattribute, neue oder modifizierte Dienste und Prozesse.
-- **Netzwerkaktivitäten:** Dokumentation der Netzwerkzugriffe und -verbindungen (z.B. mittels pcap-Dateien).
-- **Temporäre Dateien und Speicherabbilder:** Abbildungen des Arbeitsspeichers und temporäre Dateien, die Hinweise auf Malware-Aktivitäten geben.
-
-Die forensische Analyse (z.B. via Autopsy) soll anhand dieser Artefakte den genauen Ablauf des Angriffs rekonstruieren und die verwendeten Techniken identifizieren.
-
----
-
-## Zusammenfassung und Fazit
-
-In dieser Dokumentation wurden drei unterschiedliche Angriffsszenarien beschrieben, die mit ForTrace++ in einer Windows-VM simuliert werden können:
-
-1. **Backdoor-Installation:**  
-   Zeigt, wie ein physischer Angriff in einer ungesicherten Umgebung zu einem persistierenden Fernzugang führen kann.
-
-2. **Passwort-Exfiltration aus Browser-Datenbanken:**  
-   Verdeutlicht die Risiken des ungeschützten Speicherns von Passwörtern in Browsern und macht auf die Notwendigkeit sicherer Passwortmanager aufmerksam.
-
-3. **Word-Makro-Ransomware:**  
-   Demonstriert, wie durch bösartige Makros in Office-Dokumenten kritische Daten verschlüsselt und somit Geschäftsprozesse lahmgelegt werden können.
-
-Diese Szenarien bieten sowohl einen praxisnahen Einblick in typische Angriffsvektoren als auch wertvolle Lehrbeispiele für forensische Analysen. Durch die Kombination aus YAML-Konfiguration und Python-Automatisierung mit ForTrace++ wird ein wiederholbarer und kontrollierter Ablauf gewährleistet – ideal für Schulungs- und Forschungszwecke.
-
-**Ausblick:**
-- Weiterentwicklung der Automatisierungsskripte, um noch realistischere Angriffsszenarien zu simulieren.
-- Integration zusätzlicher Analyse-Tools zur erweiterten forensischen Untersuchung.
-- Evaluation und Vergleich der Ergebnisse mit realen Angriffsdaten.
-
----
-
-
-
-
-
-
-# Szenario 3 – Dateiverschlüsselung (Ransomware)  
-
-## 📌 Beschreibung  
-Dieses Skript verschlüsselt alle Dateien und Ordner im **"Documents"**-Ordner des aktuellen Benutzers.  
-- Die Verschlüsselung erfolgt mit einer **XOR-Operation**.  
-- Dateinamen werden zusätzlich in **Base64 kodiert**, um ungültige Zeichen zu vermeiden.  
-- Am Ende wird eine Datei **"YOU_GOT_HACKED.txt"** auf dem Desktop erstellt, die eine Liste aller verschlüsselten Dateien enthält.  
-- Eine **Log-Datei mit Debug-Informationen** wird im "Downloads"-Ordner gespeichert.  
-- Das **Konsolenfenster bleibt verborgen**, um den Prozess im Hintergrund auszuführen.  
-
-## ⚙️ Erstellung der ausführbaren Datei  
+#### ⚙️ Creating the Executable File  
 ```sh
-cd szenario3-encryption/
-pyinstaller --onefile --noconsole --icon=PowerPoint.ico .\simple_xor_encrypt.py
+cd scenario3-encryption/
+pyinstaller --onefile --noconsole --icon=PowerPoint.ico ./simple_xor_encrypt.py
 ```
-- ![encryption](pictures/before_encryption.png)
+- ![encryption](pictures/before_encryption.png)  
 - ![encryption](pictures/after_encryption.png)
+--- 
+
+## Expected Artifacts and Analysis
+
+For all scenarios, the following artifacts are expected:
+
+- **Log Files:** Detailed logs documenting timestamps, execution flow, and types of performed actions.
+- **System Changes:** Recorded modifications to system configurations, file attributes, and new or altered services/processes.
+- **Network Activity:** Documentation of network access and connections (e.g., using pcap files).
+- **Temporary Files and Memory Dumps:** Snapshots of RAM and temporary files providing clues about malware activity.
+
+Forensic analysis (e.g., via Autopsy) should reconstruct the exact attack flow and identify the techniques used.
+
+---
+
+## Summary and Conclusion
+
+This documentation outlines three different attack scenarios that can be simulated with ForTrace++ in a Windows VM:
+
+1. **Backdoor Installation:**
+   Demonstrates how a physical attack in an unsecured environment can lead to persistent remote access.
+
+2. **Password Exfiltration from Browser Databases:**
+   Highlights the risks of storing passwords insecurely in browsers and underscores the necessity of using secure password managers.
+
+3. **Word Macro Ransomware:**
+   Shows how malicious macros in Office documents can encrypt critical data, disrupting business operations.
+
+These scenarios provide both a practical insight into common attack vectors and valuable case studies for forensic analysis. The combination of YAML configuration and Python automation with ForTrace++ ensures a repeatable and controlled workflow—ideal for training and research purposes.
+
+**Outlook:**
+- Further development of automation scripts to simulate even more realistic attack scenarios.
+- Integration of additional analysis tools for advanced forensic investigation.
+- Evaluation and comparison of results with real-world attack data.
+
+---
