@@ -1,31 +1,31 @@
 #!/bin/bash
-# Dieses Skript erstellt eine neue Windows 10 VM via virt-install.
-# Hinweis: Es wird vorausgesetzt, dass libvirt und alle notwendigen Tools installiert sind.
+# This script creates a new Windows 10 VM using virt-install.
+# Note: It assumes that libvirt and all necessary tools are installed.
 
-# Variablen definieren
+# Define variables
 VM_NAME="win10"
-ISO_PATH="/pfad/zur/windows10.iso"         # Pfad zum Windows 10 ISO-Image (z.B. von Microsoft heruntergeladen)
+ISO_PATH="/path/to/windows10.iso"         # Path to the Windows 10 ISO image (e.g., downloaded from Microsoft)
 DISK_PATH="/var/lib/libvirt/images/${VM_NAME}.qcow2"
-DISK_SIZE=40                               # Größe in GiB
-MEMORY=8192                                # Arbeitsspeicher in MB
-VCPUS=6                                    # Anzahl der CPUs
-NETWORK="default"                          # Name des libvirt-Netzwerks, meist "default"
-OS_VARIANT="win10"                         # libvirt OS-Variant (ggf. anpassen)
+DISK_SIZE=40                              # Size in GiB
+MEMORY=8192                               # RAM in MB
+VCPUS=6                                   # Number of CPUs
+NETWORK="default"                         # Name of the libvirt network, usually "default"
+OS_VARIANT="win10"                        # libvirt OS variant (adjust if necessary)
 
-# Prüfen, ob das ISO-Image vorhanden ist
+# Check if the ISO image exists
 if [ ! -f "$ISO_PATH" ]; then
-  echo "Das ISO-Image wurde nicht gefunden: $ISO_PATH"
+  echo "The ISO image was not found: $ISO_PATH"
   exit 1
 fi
 
-# Festplatten-Image erstellen (falls noch nicht vorhanden)
+# Create the disk image if it doesn't already exist
 if [ ! -f "$DISK_PATH" ]; then
-  echo "Erstelle Festplatten-Image: $DISK_PATH"
-  qemu-img create -f qcow2 "$DISK_PATH" ${DISK_SIZE}G || { echo "Fehler beim Erstellen des Disk-Images."; exit 1; }
+  echo "Creating disk image: $DISK_PATH"
+  qemu-img create -f qcow2 "$DISK_PATH" ${DISK_SIZE}G || { echo "Error creating disk image."; exit 1; }
 fi
 
-# Virtuelle Maschine erstellen und Installation starten
-echo "Starte virt-install für die VM $VM_NAME..."
+# Create the virtual machine and start the installation
+echo "Starting virt-install for VM $VM_NAME..."
 virt-install \
   --name "$VM_NAME" \
   --os-variant "$OS_VARIANT" \
@@ -40,11 +40,11 @@ virt-install \
   --boot cdrom,hd,menu=on \
   --noautoconsole
 
-echo "Die VM $VM_NAME wurde erstellt. Bitte schließe die Windows-Installation (und alle manuellen Konfigurationsschritte) über einen GUI-Client wie Virtual Machine Manager ab."
+echo "The VM $VM_NAME has been created. Please complete the Windows installation (and any manual configuration steps) using a GUI client like Virtual Machine Manager."
 
-# Optional: Warte, bis die Installation abgeschlossen ist, und erstelle einen Snapshot
-# Hierbei ist zu beachten, dass Windows-Installationen meist manuelle Eingriffe benötigen.
-# Das folgende Kommando setzt voraus, dass die VM ausgeschaltet ist.
+# Optional: Wait for the installation to finish and create a snapshot
+# Note: Windows installations often require manual intervention.
+# The following command assumes that the VM has been shut down.
 #
-# read -p "Ist die Windows-Installation abgeschlossen und die VM ausgeschaltet? (Enter zum Fortfahren)"
-# virsh snapshot-create-as "$VM_NAME" "veracrypt" "Snapshot für ForTrace++ Szenario" --atomic
+# read -p "Has the Windows installation finished and the VM been shut down? (Press Enter to continue)"
+# virsh snapshot-create-as "$VM_NAME" "Clean_Install" "Snapshot for ForTrace++ scenario" --atomic

@@ -8,6 +8,7 @@
   - [EndeavourOS (Arch Linux)](#endeavouros-arch-linux)
   - [Preparing the Windows ISO](#preparing-the-windows-iso)
   - [Setting up the Windows VM](#setting-up-the-windows-vm)
+  - [Preparing the Windows VM for the Scenarios](#preparing-the-windows-vm-for-the-scenarios)
 - [Scenarios](#scenarios)
   - [Scenario 1: Easy – Unauthorized Remote Access via Backdoor](#scenario-1-easy--unauthorized-remote-access-via-backdoor)
   - [Scenario 2: Medium – Simulation of Secure Malware / Ransomware-like Behavior](#scenario-2-medium--simulation-of-secure-malware--ransomware-like-behavior)
@@ -38,7 +39,7 @@ In simple terms: Targeted attacks and malware simulations are executed in a virt
 - Installation steps are documented here for completeness. 
 For individual installations and potential issues, 
 please refer to the official [Fortrace++ documentation](https://gitlab.com/DW0lf/fortrace#installation).
-- I used two Maschines while working on the task (I. Kali Linux, II. EndeavourOS (similar to Arch Linux, the Distro used by the Fortrace++ Project Maintainer))
+- I used two Maschines while working on the task (I. Kali Linux, II. EndeavourOS (similar to Arch Linux, the distro used by the Fortrace++ project maintainer))
 
 ### Kali Linux
 - System setup for this documentation:
@@ -90,6 +91,12 @@ readlink -f src > .venv/lib/python$PYTHON_VERSION/site-packages/fortrace_src.pth
 ---
 
 ### EndeavourOS (Arch Linux)
+- System Specifications:
+  - OS: EndeavourOS x86_64 (Dual-Boot with Win10)
+  - Kernel: Linux 6.13.2-arch1-1
+  - CPU: AMD Ryzen 7 4700U (8) @ 2.00 GHz
+  - GPU: AMD Radeon Vega Series / Radeon Vega Mobile Series [Integrated]
+  - Memory: 16 GiB
 
 ```sh
 git clone https://gitlab.com/DW0lf/fortrace.git
@@ -146,22 +153,43 @@ readlink -f src > .venv/lib/python$PYTHON_VERSION/site-packages/fortrace_src.pth
 - Use a tool like **7-Zip** or **Rufus** to extract the contents
   - `sudo pacman -S p7zip`
   - `7z x Win10_22H2_EnglishInternational_x64v1.iso -o/DESTINATION/PATH/Win10_ISO`
+- or just mount it in Linux/Windows and copy the files
+  - `sudo mount /YOUR_PATH/Win10_22H2_Unattended_BIOS.iso /mnt/iso`
 
 2. Create an `autounattend.xml` File
 - This file automates the Windows installation by answering all prompts
 - generate one using **Windows System Image Manager (SIM)** (part of Windows ADK)
   - or use an online tool like this: https://www.windowsafg.com/win10x86_x64_uefi.html
-- example `autounattend.xml` is in the scripts-folder
+  - **Recommended alternative:** https://schneegans.de/windows/unattend-generator/
+    - more options for customization available
+    - it's even possible to add custom PowerShell scripts that run after the automatic installation process
+    - there are multiple manual steps in the Fortrace Documentation to prepare the Windows 10 VM that can be automated this way
+- example `autounattend.xml` can be found in the `scripts/`-folder
+  - during the installation process is no user interaction required
+  - some of the automated steps are for instance:
+    - Language and Locale Configuration (System Locale: `en-US`)
+    - Partitioning and Disk Formatting (via `diskpart`)
+    - Install OS on `Disk 0, Partition 2`
+    - Accept EULA automatically
+    - Use generic product key (Windows is now activated)
+    - Set the computer name to `fortrace-PC`
+    - Create user `fortrace` (Administrator)
+    - Auto-logon enabled for one session with stored password
+    - Mouse Settings Tweaks for Default User (Modify registry keys to disable pointer acceleration)
+    - it's also possible to turn off Windows Defender (interesting for the Malware Scenarios)
 
 3. Place `autounattend.xml` in the ISO
-- Copy the `autounattend.xml` file into `\sources\` or just into the root of the extracted ISO folder.
+- Copy the `autounattend.xml` file into `\sources\` for a network install or just into the root `\` of the extracted ISO folder for booting from USB / CD-ROM (default case for VMs)
 
 4. Rebuild the ISO
 - Windows (using `oscdimg` from Windows ADK):
+  - Installation: `winget install --id Microsoft.WindowsADK --source winget` (could take a while, approx. 2GB of disk space needed)
+  - If command doesn't work a possible fix is to add it to the PATH for this session: `$env:Path += ";C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg"`
 ```sh
-oscdimg -m -o -u2 -udfver102 -bootdata:2#p0,e,bC:\WinISO\boot\etfsboot.com#pEF,e,bC:\WinISO\efi\microsoft\boot\efisys.bin C:\WinISO C:\Win10Unattended.iso
+oscdimg -m -o -u2 -udfver102 -bootdata:2#p0,e,bD:\YOUR_PATH\Win10_22H2_EnglishInternational_x64v1\boot\etfsboot.com#pEF,e,bD:\YOUR_PATH\Win10_22H2_EnglishInternational_x64v1\efi\microsoft\boot\efisys.bin D:\YOUR_PATH\Win10_22H2_EnglishInternational_x64v1 D:\YOUR_PATH\Win10_22H2_Unattended.iso
 ```
 - Linux (using `xorriso`):
+  - The Windows approach is recommended, as the building process on Linux was not as successful and resulted in significant time loss
 ```sh
 xorriso -as mkisofs -iso-level 3 -full-iso9660-filenames -volid "Win10" \
 -eltorito-boot boot/etfsboot.com -no-emul-boot -boot-load-size 8 \
@@ -171,35 +199,101 @@ xorriso -as mkisofs -iso-level 3 -full-iso9660-filenames -volid "Win10" \
 
 5. Test the ISO in a Virtual Machine to verify if the installation runs without manual input.
 
-- Optional Customizations
-  - **Pre-install drivers**: Add them to `\$OEM$\$1\Drivers\` in the ISO.
-  - **Pre-install software**: Use `setupcomplete.cmd` in `\$OEM$\$1\Setup\Scripts\`.
-  - **Auto-activate Windows**: Embed a volume license key in `autounattend.xml`.
+- **Important** (if using the virt-manager): Before starting the installation, configure the VM in **virt-manager** to use either **UEFI** or **BIOS** as needed since it is not possible to change that setting after the first initialisation
 
+**BIOS Mode**  
+- The installation works without any keyboard interaction.  
+- Important: In the **unattend.xml** file, set **MBR** instead of **GPT** to ensure BIOS compatibility.  
+
+**UEFI Mode** 
+- The installation works, but requires **one** keyboard input to start.  
+
+
+**Optional Customizations**
+- **Pre-install drivers**: Add them to `\$OEM$\$1\Drivers\` in the ISO.
+- **Pre-install software**: Use `setupcomplete.cmd` in `\$OEM$\$1\Setup\Scripts\`.
+- **Auto-activate Windows**: Embed a volume license key in `autounattend.xml`.
+
+- There are also great ressources to optimize the unattended Windows ISO creation process
+  - https://github.com/memstechtips/UnattendedWinstall
+  - https://github.com/memstechtips/WIMUtil
 
 ### Setting up the Windows VM
+The Instructions from the official Fortrace++ Documentation are describing multiple manual steps to create the Windows VM with the virt-manager GUI, but there is also the possibility to automate this process with a script.
+
+- Use the `create_vm.sh` script for an automated Win10 VM creation or manually follow the steps in the [official documentation](https://gitlab.com/DW0lf/fortrace/-/tree/main/examples/Windows/ForTrace_Workshop/VeraCrypt#installation-of-windows-10-vm)
+  - Notice: The script is just a reference and needs still to be adjusted for the system it's running on
+  - with more testing, there could be the possibility to create a generic script, that works on most of the user systems
+
 
 - Using **libvirt** and the **virt-manager**
   - to check the network connections: `virsh net-list --all` (default needs to be running)
   - start default network: `virsh net-start default` or on-boot: `virsh net-autostart default`
-  - Troubleshooting #1: Error starting network 'default': internal error: firewalld can't find the 'libvirt' zone that should have been installed with libvirt
-    - `sudo firewall-cmd --permanent --new-zone=libvirt`
-    - `sudo firewall-cmd --permanent --zone=libvirt --set-target=ACCEPT`
-    - `sudo firewall-cmd --reload`
-    - `sudo firewall-cmd --permanent --zone=libvirt --add-interface=virbr0`
-    - `sudo firewall-cmd --reload`
-    - verify: `sudo firewall-cmd --get-active-zones`
-    - `sudo virsh net-start default` --> verify: `sudo virsh net-list --all`
-  - Troubleshooting #2 - how to use virsh commands without `sudo`
-    - check if `s -l /var/run/libvirt/libvirt-sock` is owned by root
-    - change to libvirt group: `sudo chown root:libvirt /var/run/libvirt/libvirt-sock`
-    - `sudo chmod 660 /var/run/libvirt/libvirt-sock`
-    - `nano ~/.config/libvirt/libvirt.conf` --> add the line: `uri_default = "qemu:///system"`
-    - restart libvirt: `sudo systemctl restart libvirtd`
-    - now no sudo is needed: `virsh net-list --all`
 
-- Use the `create_vm.sh` script for automated Win10 VM creation or manually follow the steps in the [official documentation](https://gitlab.com/DW0lf/fortrace/-/tree/main/examples/Windows/ForTrace_Workshop/VeraCrypt#installation-of-windows-10-vm), as Windows OS initial installation requires manual configuration within the VM.
+**Troubleshooting** 
+- #1: Error starting network 'default': internal error: firewalld can't find the 'libvirt' zone that should have been installed with libvirt
+  - `sudo firewall-cmd --permanent --new-zone=libvirt`
+  - `sudo firewall-cmd --permanent --zone=libvirt --set-target=ACCEPT`
+  - `sudo firewall-cmd --reload`
+  - `sudo firewall-cmd --permanent --zone=libvirt --add-interface=virbr0`
+  - `sudo firewall-cmd --reload`
+  - verify: `sudo firewall-cmd --get-active-zones`
+  - `sudo virsh net-start default` --> verify: `sudo virsh net-list --all`
+- #2: how to use virsh commands without `sudo`
+  - check if `s -l /var/run/libvirt/libvirt-sock` is owned by root
+  - change to libvirt group: `sudo chown root:libvirt /var/run/libvirt/libvirt-sock`
+  - `sudo chmod 660 /var/run/libvirt/libvirt-sock`
+  - `nano ~/.config/libvirt/libvirt.conf` --> add the line: `uri_default = "qemu:///system"`
+  - restart libvirt: `sudo systemctl restart libvirtd`
+  - now no sudo is needed: `virsh net-list --all`
 
+**Create Snapshots**
+- after the preparation of the VM make sure to make a snapshot (maintain a secure state of the virtual machine)
+- create multiple snapshots after some more customization/preparation of the maschine to act as an entry point for the Fortrace++ Scenarios
+- use the GUI (virt-manager): Show virtual maschine details --> Manage VM snapshots
+- commandline: `virsh snapshot-create-as "$VM_NAME" "Clean_Install" "Snapshot for ForTrace++ scenario" --atomic`
+
+### Preparing the Windows VM for the Scenarios
+- For the given example scenario (Windows, VeraCrypt) in the Fortrace++ Repo are some more preparation steps described
+- These can be also automated with a PowerShell script (immediately with the first unattended installation or later on)
+
+`scripts/vm_preparation.ps1` (run as administrator)
+```ps1
+# Run as Administrator
+
+# 1. Install VeraCrypt using winget
+Write-Host "Installing VeraCrypt..."
+winget install --id IDRIX.VeraCrypt -e
+
+# 2. Set Network Profile to Private
+Write-Host "Setting Network Profile to Private..."
+$network = Get-NetConnectionProfile
+if ($network) {
+    Set-NetConnectionProfile -Name $network.Name -NetworkCategory Private
+}
+
+# 3. Disable Notifications
+Write-Host "Disabling Windows Notifications..."
+$RegPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\PushNotifications"
+Set-ItemProperty -Path $RegPath -Name ToastEnabled -Value 0
+
+# 4. Disable 'SecureBootEncodeUEFI' in Task Scheduler
+Write-Host "Disabling SecureBootEncodeUEFI Task..."
+$taskName = "\Microsoft\Windows\PI\SecureBootEncodeUEFI"
+if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) {
+    Disable-ScheduledTask -TaskName $taskName
+}
+
+# 5. Apply Windows Updates
+Write-Host "Applying Windows Updates..."
+Install-Module PSWindowsUpdate -Force -SkipPublisherCheck
+Install-WindowsUpdate -AcceptAll -IgnoreReboot
+
+# 6. Restart the System if Updates Require It
+Write-Host "Restarting System..."
+shutdown /r /t 10
+```
+- Create the Snapshot: `virsh snapshot-create-as win10_bios "veracrypt" "Snapshot for VeraCrypt scenario" --atomic`
 ---
 
 ## Scenarios
