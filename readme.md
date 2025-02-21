@@ -256,44 +256,88 @@ The Instructions from the official Fortrace++ Documentation are describing multi
 ### Preparing the Windows VM for the Scenarios
 - For the given example scenario (Windows, VeraCrypt) in the Fortrace++ Repo are some more preparation steps described
 - These can be also automated with a PowerShell script (immediately with the first unattended installation or later on)
-
 `scripts/vm_preparation.ps1` (run as administrator)
+  - **Enable Script Execution**: `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force`
+  - **(Optional) Revert Execution Policy**: `Set-ExecutionPolicy Restricted -Scope CurrentUser -Force`
+- Windows VM: `Win+X` > press `A` or select `PowerShell as Administrator`
+  - `cd C:\Users\fortrace\Desktop\`
+  - `.\powershell_script.ps1`
+
 ```ps1
 # Run as Administrator
+Set-ExecutionPolicy Bypass -Scope Process -Force
 
-# 1. Install VeraCrypt using winget
+# 1. Ensure NuGet Provider is Installed (No User Input)
+Write-Host "Installing NuGet Provider..."
+Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+
+# 2. Ensure Winget is Installed
+Write-Host "Checking for Winget..."
+if (-Not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    Write-Host "Winget not found. Installing..."
+    $wingetInstaller = "$env:TEMP\winget.msixbundle"
+    Invoke-WebRequest -Uri "https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle" -OutFile $wingetInstaller
+    Add-AppxPackage -Path $wingetInstaller
+}
+
+# 3. Install VeraCrypt Silently (No User Prompts)
 Write-Host "Installing VeraCrypt..."
-winget install --id IDRIX.VeraCrypt -e
+winget install --id IDRIX.VeraCrypt -e --silent --accept-source-agreements --accept-package-agreements
 
-# 2. Set Network Profile to Private
+# 4. Set Network Profile to Private
 Write-Host "Setting Network Profile to Private..."
 $network = Get-NetConnectionProfile
 if ($network) {
     Set-NetConnectionProfile -Name $network.Name -NetworkCategory Private
 }
 
-# 3. Disable Notifications
+# 5. Disable Notifications
 Write-Host "Disabling Windows Notifications..."
 $RegPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\PushNotifications"
 Set-ItemProperty -Path $RegPath -Name ToastEnabled -Value 0
 
-# 4. Disable 'SecureBootEncodeUEFI' in Task Scheduler
+# 6. Disable 'SecureBootEncodeUEFI' in Task Scheduler
 Write-Host "Disabling SecureBootEncodeUEFI Task..."
 $taskName = "\Microsoft\Windows\PI\SecureBootEncodeUEFI"
 if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) {
     Disable-ScheduledTask -TaskName $taskName
 }
 
-# 5. Apply Windows Updates
+# 7. Apply Windows Updates (No User Input)
 Write-Host "Applying Windows Updates..."
 Install-Module PSWindowsUpdate -Force -SkipPublisherCheck
 Install-WindowsUpdate -AcceptAll -IgnoreReboot
 
-# 6. Restart the System if Updates Require It
+# 8. Restart the System if Updates Require It
 Write-Host "Restarting System..."
 shutdown /r /t 10
+
+# 9. After VM Shutdown, Take a Snapshot (Run from Host)
+Write-Host "Once the VM shuts down, take a snapshot from the host machine:"
+Write-Host "virsh snapshot-create-as win10_bios 'veracrypt' 'Snapshot after installation' --atomic"
 ```
 - Create the Snapshot: `virsh snapshot-create-as win10_bios "veracrypt" "Snapshot for VeraCrypt scenario" --atomic`
+
+### How to copy the PowerShell script into the VM
+- over the **network** (create SAMBA share on the Linux host)
+  - `sudo nano /etc/samba/smb.conf`
+```ini
+[global]
+   workgroup = WORKGROUP
+   server string = Samba Server
+   security = user
+   map to guest = Bad User
+
+[shared]
+   path = /home/YOUR_USER/shared
+   read only = no
+   guest ok = yes
+
+```
+- `sudo systemctl restart smb`
+- On the Win10 Host: `\\192.168.122.1\shared`
+- or install the [SPICE Guest Tools](https://www.spice-space.org/download/windows/spice-guest-tools/spice-guest-tools-latest.exe) on the Windows 10 VM to allow copy/paste
+
 ---
 
 ## Scenarios
@@ -396,5 +440,10 @@ These scenarios provide both a practical insight into common attack vectors and 
 - Further development of automation scripts to simulate even more realistic attack scenarios.
 - Integration of additional analysis tools for advanced forensic investigation.
 - Evaluation and comparison of results with real-world attack data.
+
+## Potential Improvements (To-Do)
+- modify the unattend.xml to automatically execute the PowerShell scripts
+  - allow the PowerShell Execution Policy
+  - automatic Install of the Windows SPICE Guest Tools
 
 ---
