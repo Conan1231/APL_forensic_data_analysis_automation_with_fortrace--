@@ -338,6 +338,25 @@ Write-Host "virsh snapshot-create-as win10_bios 'veracrypt' 'Snapshot after inst
 - On the Win10 Host: `\\192.168.122.1\shared`
 - or install the [SPICE Guest Tools](https://www.spice-space.org/download/windows/spice-guest-tools/spice-guest-tools-latest.exe) on the Windows 10 VM to allow copy/paste
 
+### Enable Autologin
+- to safe time running the scenarios
+- Skipping Login via Auto-Login Configuration
+  - run these PowerShell commands on the VM (with admin privileges)
+```ps1
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -Name "AutoAdminLogon" -Value "1"
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -Name "DefaultUserName" -Value "fortrace"
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -Name "DefaultPassword" -Value "fortrace"
+```
+- Tested, but doesn't seem to work with default Fortrace-Scenarios
+  - commented out: `# domain.env.login(config["domain"]["username"], config["domain"]["password"])`
+  - but got the following error:
+```py
+File "/home/user/fortrace/src/fortrace/utility/desktop_environments/Windows/Windows.py", line 79, in open_application
+    raise DesktopEnvironmentException(
+        "Windows application window is not responding as expected"
+    )
+fortrace.utility.exceptions.DesktopEnvironmentException: Windows application window is not responding as expected
+```
 ---
 
 ## Scenarios
@@ -348,7 +367,7 @@ Write-Host "virsh snapshot-create-as win10_bios 'veracrypt' 'Snapshot after inst
 
 This scenario simulates a simple case where a laptop is left unattended. An attacker takes the opportunity to set up remote access by installing a backdoor on the system. This backdoor can later be detected in a forensic analysis (e.g., using Autopsy).
 
-**Technical Implementation:**
+**Overview:**
 
 - **Environment:**  
   - VM image where the laptop (simulated machine) is operated in an "unattended" state.
@@ -361,8 +380,44 @@ This scenario simulates a simple case where a laptop is left unattended. An atta
 - **Forensic Artifacts:**
   - Log entries documenting the time and process of backdoor installation.
   - System modifications (new services, changed configurations).
+    - Can be found by analysing created Image dump of the Scenario VM
+    - Files are usally automatically created at the end of the scenario execution and save at `/var/tmp/SCENARIO_NAME/VM_NAME`
+    - `scenario_1.elf` --> analyze with Autopsy
   - Network connections evidencing remote access.
+    - .pcapng-File
+    - Can be analyzed using Wireshark
+    - Contains all network traffic during scenario execution
 
+**Technical Implementation:**
+- Install netcat on Host-System: `sudo pacman -S netcat`
+  - `nc -lvnp 4444` listen on port and wait for the connection of the Windows VM Target
+- Prerequisite for the Windows VM:
+  - I. Best Solution would be to deactivate Windows Defender completely already in the `autounattend.xml`
+  - II. Disabling Defender via Registry (afterwards)
+  - mandatory since the signature of the ReverseShell used is already well-known
+  - **Tamper Protection**
+    - Windows 10/11 includes Tamper Protection, which prevents Defender settings from being changed.
+    - Disable tamper protection manually first before running these commands.
+    - ![tamper protection](pictures/tamper.png)
+
+```ps1
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender" -Name "DisableAntiSpyware" -Value 1
+```
+> Notice: Windows may require a reboot for changes to take effect.
+
+
+
+**Usage:**
+  - copy the `.yaml` and `.py` files from the folder `scenario1-backdoor/` to your fortrace installation folder
+  - and create a folder so it looks like that:
+![folder](pictures/folder-structure1.png)  
+  - start the virtual environment and run the `scenario1.py`: 
+```
+source .venv/bin/activate
+python scenarios/scenario1.py
+```
+**(Optional)**: Observe the automation process through virt-manager as it interacts with the VM. 
+> **Important**: Do not interact with the VM during the automation process.
 ---
 
 ### Scenario 2: Medium – Exfiltrate Passwords from the SQLite Database of the Webbrowser
@@ -441,9 +496,35 @@ These scenarios provide both a practical insight into common attack vectors and 
 - Integration of additional analysis tools for advanced forensic investigation.
 - Evaluation and comparison of results with real-world attack data.
 
+--- 
+## General Troubleshooting
+- If you encounter these Errors while working with Fortrace++ it's propably because the VM doesn't have enough RAM (minimum: 8192 MiB)
+```py
+Traceback (most recent call last):
+  File "/home/user/fortrace/scenarios/scenario1-backdoor/scenario1.py", line 104, in <module>
+    scenario_1()
+    ~~~~~~~~~~^^
+  File "/home/user/fortrace/scenarios/scenario1-backdoor/scenario1.py", line 52, in scenario_1
+    domain.env.login(config["domain"]["username"], config["domain"]["password"])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/fortrace/src/fortrace/utility/desktop_environments/Windows/Windows.py", line 166, in login
+    self._qs.mouse.init()
+    ~~~~~~~~~~~~~~~~~~~^^
+  File "/home/user/fortrace/src/fortrace/core/qemu_monitor.py", line 61, in init
+    self.find_mouse_ptr()
+    ~~~~~~~~~~~~~~~~~~~^^
+  File "/home/user/fortrace/src/fortrace/core/qemu_monitor.py", line 98, in find_mouse_ptr
+    mouse_ptr_box = max(
+        bounding_boxes, key=lambda x: x[0]
+    )  # take the bounding box that is more to the right
+ValueError: max() iterable argument is empty
+
+```
+
 ## Potential Improvements (To-Do)
 - modify the unattend.xml to automatically execute the PowerShell scripts
   - allow the PowerShell Execution Policy
   - automatic Install of the Windows SPICE Guest Tools
+  - deactivate Windows Defender already in the ISO, so the Malware Examples work without interruption
 
 ---
