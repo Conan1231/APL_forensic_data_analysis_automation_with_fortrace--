@@ -1,0 +1,23 @@
+name: Scenario 2
+description: Configuration file for the 2nd Scenario.
+author: Clasen, Tim
+collections:
+  c-http-0:
+    type: http
+    urls: "scenarios/scenario2-browser_password_exfiltration/scenario_2_browsing.txt"
+root: /var/tmp/ForTrace_scenario_2
+overwrite_root: True
+domain:
+  username: "fortrace"
+  password: "fortrace"
+  name: "win10_defender"
+  network: "default"
+  os_type: OSType.WINDOWS
+  desktop_env: DesktopEnvironmentType.Windows_10
+  start_sniffer: False
+  snapshot: "scenario2"
+  dump_images: False
+explorer:
+  path: 'C:\Users\fortrace\Desktop\'
+backdoor:
+  attacker_ip: "192.168.122.1"

