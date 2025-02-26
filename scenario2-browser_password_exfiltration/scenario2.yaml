@@ -1,6 +1,5 @@
 name: Scenario 2
 description: Configuration file for the 2nd Scenario.
-author: Clasen, Tim
 collections:
   c-http-0:
     type: http
@@ -16,7 +15,7 @@ domain:
   desktop_env: DesktopEnvironmentType.Windows_10
   start_sniffer: False
   snapshot: "scenario2"
-  dump_images: False
+  dump_images: True
 explorer:
   path: 'C:\Users\fortrace\Desktop\'
 backdoor:

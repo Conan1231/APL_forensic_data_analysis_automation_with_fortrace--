@@ -714,6 +714,16 @@ Before executing the scenario, the **VM must be prepared** with the required too
    pip install pycryptodomex
    ```
 
+- Use the Edge Browser to browse the following websites 
+  1. Enter some random login credentials
+  2. Select "Save Password" on the Browser Pop-up
+```
+https://www.paypal.com/signin
+https://www.reddit.com/login/
+https://x.com/i/flow/login
+```
+
+
 ---
 
 ### **Password Extraction from Edge**
@@ -851,9 +861,15 @@ fortrace/
 Before executing the scenario, **host the scripts on a local web server** to allow Windows to download them automatically:
 
 ```sh
-cd ~/fortrace/scenarios/scenario2-password_exfiltration
-python -m http.server 8080
+cd ~/fortrace/scenarios/scenario2-browser_password_exfiltration
+python -m http.server 8081
 ```
+
+> **Note:** Add Firewall Rules for Port 8081 on the Linux host
+  ```
+  sudo firewall-cmd --zone=libvirt --add-port=8081/tcp --permanent
+  sudo firewall-cmd --reload
+  ```
 
 ---
 
@@ -936,7 +952,8 @@ The script (simple_xor_encrypt.py) encrypts all files and folders in the **"Docu
 
 #### ⚙️ Creating the Executable File  
 ```sh
-cd scenario3-encryption/
+cd scenarios/scenario3-encryption/
+pip install pyinstaller
 pyinstaller --onefile --noconsole --icon=PowerPoint.ico ./simple_xor_encrypt.py
 ```
 ![encryption](pictures/before_encryption.png)  
