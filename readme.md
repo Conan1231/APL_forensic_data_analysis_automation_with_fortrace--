@@ -16,6 +16,41 @@
 - [Expected Artifacts and Analysis](#expected-artifacts-and-analysis)
 - [Summary and Conclusion](#summary-and-conclusion)
 
+## Table of Contents
+
+- [Introduction](#introduction)
+- [Task Description](#task-description)
+- [Installation of Fortrace++](#installation-of-fortrace)
+  - [Kali Linux](#kali-linux)
+  - [EndeavourOS (Arch Linux)](#endeavouros-arch-linux)
+  - [Preparing the Windows ISO](#preparing-the-windows-iso)
+  - [Setting up the Windows VM](#setting-up-the-windows-vm)
+  - [Preparing the Windows VM for the Scenarios](#preparing-the-windows-vm-for-the-scenarios)
+- [Scenarios](#scenarios)
+  - [Scenario 1: Easy – Unauthorized Remote Access via Backdoor](#scenario-1-easy-unauthorized-remote-access-via-backdoor)
+    - [Description](#description)
+    - [Technical Implementation](#technical-implementation)
+    - [Configuration and Execution](#configuration-and-execution)
+  - [Scenario 2: Medium – Exfiltrate Passwords from the Local Database of the Web Browser](#scenario-2-medium-exfiltrate-passwords-from-the-local-database-of-the-web-browser)
+    - [Description](#description-1)
+    - [Technical Implementation](#technical-implementation-1)
+    - [Configuration and Execution](#configuration-and-execution-1)
+  - [Scenario 3: Hard – File Encryption (Ransomware-like Behavior)](#scenario-3-hard-file-encryption-ransomware-like-behavior)
+    - [Description](#description-2)
+    - [Technical Implementation](#technical-implementation-2)
+    - [Configuration and Execution](#configuration-and-execution-2)
+- [Expected Artifacts and Analysis](#expected-artifacts-and-analysis)
+  - [Forensic Artifacts](#forensic-artifacts)
+  - [Network Traffic Analysis](#network-traffic-analysis)
+  - [Memory and Disk Analysis](#memory-and-disk-analysis)
+  - [Converting `.raw` to `.e01` for Analysis](#converting-raw-to-e01-for-analysis)
+- [General Troubleshooting](#general-troubleshooting)
+- [Summary and Conclusion](#summary-and-conclusion)
+  - [Evaluation of Fortrace++](#evaluation-of-fortrace)
+  - [Limitations and Possible Improvements](#limitations-and-possible-improvements)
+
+
+
 ---
 
 ## Introduction
