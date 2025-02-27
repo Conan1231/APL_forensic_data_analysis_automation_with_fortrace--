@@ -1120,43 +1120,273 @@ python scenarios/scenario2-browser_password_exfiltration/scenario2.py
 > [GitHub - unode/firefox_decrypt: Firefox Decrypt is a tool to extract passwords from Mozilla (Firefox™, Waterfox™, Thunderbird®, SeaMonkey®) profiles](https://github.com/unode/firefox_decrypt?tab=readme-ov-file#non-interactive-mode)
 ---
 
-### Scenario 3: Hard - File Encryption (Ransomware-like Behavior)
+# Scenario 3: Hard - File Encryption (Ransomware-like Behavior)
 
-**Description:**
+## Description
 
-This scenario simulates controlled malware activity resembling a ransomware attack. System files are encrypted, but in a safe test environment to prevent actual damage.
+This scenario simulates controlled malware activity resembling a ransomware attack. System files are encrypted within a safe test environment to demonstrate ransomware behavior without causing actual damage.
 
-**Technical Implementation:**
+## Technical Implementation
 
-- **Environment:**  
-  - VM image where special test files and directories are created.
-  - Isolated network to prevent spread.
-- **Execution:**
-  1. **Preparation:** Create a test directory with dummy files.
-  2. **Malware Simulation:** A Python script "encrypts" (simulates encryption of) the files using a simple encryption method (e.g., XOR encryption). All actions are logged.
-  3. **Recovery:** A decryption script is provided to restore test environment integrity.
-- **Forensic Artifacts:**
-  - Log files documenting encryption timestamps and actions.
-  - Changed file attributes and unusual file naming conventions.
-  - Memory traces and temporary files showing malware activity.
+### Environment and Preparation
+- Windows 10 virtual machine configured with ForTrace++
+- Isolated network to prevent unintended spread
+- Compatible with Windows Defender (remains enabled during execution)
+- Pre-configured snapshot for quick setup and reset
+- Place the Malware `scenario3-encryption/Business_Presentation.exe` on the Desktop of the Windows VM as preparation step
 
-#### 📌 Description of the encryption script 
-The script (simple_xor_encrypt.py) encrypts all files and folders in the **"Documents"** directory of the current user.  
-- Encryption is performed using a **XOR operation**.  
-- Filenames are additionally **Base64 encoded** to avoid invalid characters.  
-- At the end, a **"YOU_GOT_HACKED.txt"** file is created on the desktop listing all encrypted files.  
-- A **log file with debug information** is stored in the "Downloads" folder.  
-- The **console window remains hidden** to execute the process in the background.  
+### Configuration (YAML)
+YAML configuration file for flexible environment setup:
 
-#### ⚙️ Creating the Executable File  
+```yaml
+name: Scenario 3
+description: Configuration file for the 3rd Scenario.
+root: /var/tmp/ForTrace_scenario_3
+overwrite_root: True
+domain:
+  username: "fortrace"
+  password: "fortrace"
+  name: "win10_bios"
+  network: "default"
+  os_type: OSType.WINDOWS
+  desktop_env: DesktopEnvironmentType.Windows_10
+  start_sniffer: False
+  snapshot: "scenario3_vga"
+  dump_images: True
+explorer:
+  path: 'C:\Users\fortrace\Desktop\'
+  path2: 'C:\Users\fortrace\Documents\'
+```
+
+**Key Configuration Elements:**
+- **root**: Base directory for scenario resources and outputs
+- **domain**: Virtual machine configuration including credentials and snapshot
+- **explorer**: Paths for file creation and execution, targeting Desktop and Documents
+
+### Execution Process
+
+#### 1. Preparation Phase
+- System boots from a clean snapshot
+- User logs in with configured credentials
+- Business documents are created to simulate a typical user environment
+
+#### 2. Attack Simulation
+- A malicious executable disguised as a PowerPoint presentation is placed on the Desktop
+- When executed, the program encrypts all files in the Documents folder
+- A ransom note is created on the Desktop
+- Detailed logs of the encryption are saved to the Downloads folder
+
+#### 3. Forensic Analysis
+- After encryption, the system creates disk image dumps for analysis
+- The VM is gracefully shut down to preserve evidence
+
+## Python Script Explanation
+
+The `scenario3.py` script orchestrates the entire simulation:
+
+### Main Components:
+
+#### 1. Environment Setup
+- Loads configuration from YAML file
+- Establishes connection to virtual domain
+- Handles user authentication with retry mechanism
+
+```python
+monitor = SimulationMonitor(
+    pathlib.Path(FORTRACE_ROOT_DIR, "scenarios/scenario3-encryption/scenario3.yaml")
+)
+domain = monitor.participant[0].domain
+config = monitor.participant[0].config
+
+domain.boot(
+    start_sniffer=config["domain"]["start_sniffer"],
+    snapshot=config["domain"]["snapshot"],
+)
+```
+
+#### 2. Document Creation (`create_business_documents`)
+- Creates realistic business folders and files:
+  - Folders: Invoices, Contracts, Clients, Projects
+  - Document Types: Invoices, contracts with realistic business content
+- Uses Explorer and Notepad applications to simulate user activity
+
+```python
+def create_business_documents(domain: GraphicalVirshDomain, config: dict):
+    # Opens File Explorer and navigates to Documents folder
+    explorer = domain.env.open_application(ApplicationType.FILE_MANAGER, "File Explorer")
+    documents_path = PureWindowsPath(config["explorer"]["path2"])
+    explorer.browse_to_directory(documents_path)
+
+    # Creates organizational folders
+    folder_names = ["Invoices", "Contracts", "Clients", "Projects"]
+    for folder_name in folder_names:
+        explorer.create_folder(folder_name)
+
+    # Creates realistic invoice documents with generated content
+    # Creates contract documents with legal agreement text
+```
+
+#### 3. Malware Execution (`execute_encryption_malware`)
+- Simulates user clicking on malicious PowerPoint file
+- Malware encrypts all documents created in the previous step
+- Creates ransom note and logs encryption activities
+
+```python
+def execute_encryption_malware(domain: GraphicalVirshDomain, config: dict):
+    # Navigate to Desktop where malware is located
+    explorer = domain.env.open_application(ApplicationType.FILE_MANAGER, "File Explorer")
+    desktop_path = PureWindowsPath(config["explorer"]["path"])
+    explorer.browse_to_directory(desktop_path)
+
+    # Execute the malware by clicking on PowerPoint-like file
+    explorer.focus_on_item("Business_Presentation.exe")
+    explorer.send_key_combination("ret")  # Executes file with Enter key
+
+    # Wait for encryption to complete and document results
+    # Navigate back to Documents to show encrypted state
+```
+
+#### 4. Content Generation
+The script includes intelligent content generation for realistic business documents:
+
+```python
+def generate_invoice_content():
+    """Generate random invoice content for test files"""
+    invoice_num = random.randint(10000, 99999)
+    month = random.randint(1, 12)
+    day = random.randint(1, 28)
+    year = 2025
+    date = f"{month:02d}/{day:02d}/{year}"
+
+    # Generate random but realistic invoice details
+    customer = random.choice(CUSTOMER_NAMES)
+    item = random.choice(ITEM_NAMES)
+    quantity = random.randint(1, 20)
+    price = random.uniform(50, 500)
+
+    # Format using invoice templates for authentic appearance
+```
+
+## Encryption Details
+
+### Encryption Implementation
+The script (`simple_xor_encrypt.py`) deploys:
+- **XOR-based encryption**: Simple but effective for demonstration
+- **Base64 filename encoding**: Prevents invalid characters while hiding original names
+- **Hidden operation**: Runs invisibly in the background
+- **Detailed logging**: Maintains record of all encryption actions
+
+![encryption](pictures/before_encryption.png)  
+![encryption](pictures/after_encryption.png)
+
+### Executable Creation
+The malware is packaged as a convincing executable:
+
 ```sh
 cd scenarios/scenario3-encryption/
 pip install pyinstaller
 pyinstaller --onefile --noconsole --icon=PowerPoint.ico ./simple_xor_encrypt.py
 ```
-![encryption](pictures/before_encryption.png)  
-![encryption](pictures/after_encryption.png)
+
+Key features:
+- **PowerPoint icon**: Disguises malware as business presentation
+- **No console window**: Runs invisibly to avoid user detection
+- **Standalone executable**: Functions without dependencies
+
+## Forensic Artifacts
+
+The scenario creates several forensic artifacts for investigation:
+- **Encrypted files**: Original business documents with altered extensions and content
+- **Ransom note**: Text file created on Desktop ("YOU_GOT_HACKED.txt")
+- **Log file**: Detailed encryption logs in Downloads folder
+- **Process artifacts**: Memory traces and Windows event logs
+- **Network activity**: Optional packet capture if sniffer is enabled
+- **Disk image**: Complete VM disk capture for comprehensive analysis
+
+## Using the ForTrace++ Scenario
+
+### Step 0: Place the Malware on the Desktop of the VM
+```
+Business_Presentation.exe
+```
+
+### Step 1: Launch the Scenario
+```sh
+cd ~/fortrace
+source .venv/bin/activate
+python scenarios/scenario3-encryption/scenario3.py
+```
+
+## Visual Documentation
+
+### Before Encryption
+![Before Encryption](/pictures/scenario3_pre_encryption.png)
+*Initial folder structure with organized business documents*
+
+### Document Creation Process
+![Invoice Creation](/pictures/scenario3_invoices.png)
+*Creating realistic business documents for encryption target*
+
+### Malware Execution
+![Desktop with Malware](/pictures/scenario3_desktop.png)
+*Malicious executable disguised as PowerPoint presentation*
+
+### After Encryption
+![Encrypted Files](/pictures/scenario3_encrypted.png)
+*Documents folder after encryption with altered filenames and extensions*
+
+## Demonstration Log
+
+The system logs all activities during the scenario (`simulation.log`), providing a timeline of events:
+
+```log
+python scenarios/scenario3-encryption/scenario3.py
+[      MainThread] :: 2025-02-27 20:32:42,741 - INFO     - Successfully created domain win10_bios
+[      MainThread] :: 2025-02-27 20:32:42,742 - INFO     - Obtained IP address 192.168.122.176 for win10_bios
+[      MainThread] :: 2025-02-27 20:33:24,377 - INFO     - Successfully booted domain win10_bios, which is now in login screen
+[      MainThread] :: 2025-02-27 20:33:24,377 - INFO     - Login attempt 1/3
+[      MainThread] :: 2025-02-27 20:34:02,909 - INFO     - Chose (609, 481, 627, 506) as mouse bounding box
+[      MainThread] :: 2025-02-27 20:34:02,910 - INFO     - System state: Windows 10 machine, user is creating business documents.
+[      MainThread] :: 2025-02-27 20:34:02,910 - INFO     - User: Creating business documents in Documents folder
+[      MainThread] :: 2025-02-27 20:34:29,311 - INFO     - Open application File Explorer
+[      MainThread] :: 2025-02-27 20:34:47,022 - INFO     - User: Creating folder 'Invoices'
+[      MainThread] :: 2025-02-27 20:34:51,991 - INFO     - User: Creating folder 'Contracts'
+[      MainThread] :: 2025-02-27 20:34:57,006 - INFO     - User: Creating folder 'Clients'
+[      MainThread] :: 2025-02-27 20:35:01,910 - INFO     - User: Creating folder 'Projects'
+[      MainThread] :: 2025-02-27 20:35:49,265 - INFO     - Open application Notepad
+[      MainThread] :: 2025-02-27 20:36:15,556 - INFO     - User: Creating invoice document 'Invoice_1_2546.txt'
+[      MainThread] :: 2025-02-27 20:37:01,031 - INFO     - Open application Notepad
+[      MainThread] :: 2025-02-27 20:37:22,597 - INFO     - User: Creating invoice document 'Invoice_2_5827.txt'
+[      MainThread] :: 2025-02-27 20:38:06,832 - INFO     - Open application Notepad
+[      MainThread] :: 2025-02-27 20:38:31,773 - INFO     - User: Creating invoice document 'Invoice_3_3542.txt'
+[      MainThread] :: 2025-02-27 20:39:21,917 - INFO     - Open application Notepad
+[      MainThread] :: 2025-02-27 20:40:06,335 - INFO     - User: Creating contract document 'IT_Service_Agreement_2025.txt'
+[      MainThread] :: 2025-02-27 20:40:22,486 - INFO     - User: Business documents have been created successfully
+[      MainThread] :: 2025-02-27 20:40:22,486 - INFO     - User: Notices a PowerPoint file on Desktop
+[      MainThread] :: 2025-02-27 20:40:56,994 - INFO     - Open application File Explorer
+[      MainThread] :: 2025-02-27 20:41:15,621 - INFO     - User: Executes what appears to be a PowerPoint presentation
+[      MainThread] :: 2025-02-27 20:41:39,831 - INFO     - System: Encryption process running in background
+[      MainThread] :: 2025-02-27 20:41:50,314 - INFO     - Attack: Files in Documents folder have been encrypted
+[      MainThread] :: 2025-02-27 20:41:50,315 - INFO     - Attack: Ransom note 'YOU_GOT_HACKED.txt' created on Desktop
+[      MainThread] :: 2025-02-27 20:41:50,315 - INFO     - Forensic Artifact: Encrypted files in Documents folder
+[      MainThread] :: 2025-02-27 20:41:50,315 - INFO     - Forensic Artifact: Log file in Downloads folder
+[      MainThread] :: 2025-02-27 20:41:56,710 - INFO     - Will create a backup of sdc in /var/tmp/ForTrace_scenario_3/win10_bios
+[      MainThread] :: 2025-02-27 20:43:01,787 - INFO     - Image dump of win10_bios completed. Took 63986ms
+[      MainThread] :: 2025-02-27 20:43:35,468 - INFO     - Successfully shutdown win10_bios
+[      MainThread] :: 2025-02-27 20:43:35,469 - INFO     - Scenario post-processing completed
+[      MainThread] :: 2025-02-27 20:43:35,470 - INFO     - Scenario completed successfully
+```
+
+## Future Extensions
+
+- **Email Delivery**: Extend the scenario with an email client to simulate phishing delivery
+- **Macro-Based Infection**: Create malicious Office documents (.docm) with encoded macros
+- **Network Propagation**: Simulate lateral movement across multiple systems
+- **Anti-Analysis Techniques**: Add evasion capabilities to demonstrate advanced malware
+- **Decryption Component**: Create companion decryption tool for educational purposes
+
 --- 
+
 
 ## Expected Artifacts and Analysis
 

@@ -1,0 +1,17 @@
+name: Scenario 3
+description: Configuration file for the 3rd Scenario.
+root: /var/tmp/ForTrace_scenario_3
+overwrite_root: True
+domain:
+  username: "fortrace"
+  password: "fortrace"
+  name: "win10_bios"
+  network: "default"
+  os_type: OSType.WINDOWS
+  desktop_env: DesktopEnvironmentType.Windows_10
+  start_sniffer: False
+  snapshot: "scenario3_vga"
+  dump_images: True
+explorer:
+  path: 'C:\Users\fortrace\Desktop\'
+  path2: 'C:\Users\fortrace\Documents\'
