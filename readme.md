@@ -1,6 +1,7 @@
 # Project Work (APL): Automated Image Creation for Forensic Data Analysis with Fortrace++
 - **main focus**: Malicious and Malware Scenarios, Automation
 ## Table of Contents
+
 - [Introduction](#introduction)
 - [Task Description](#task-description)
 - [Installation of Fortrace++](#installation-of-fortrace)
@@ -11,45 +12,23 @@
   - [Preparing the Windows VM for the Scenarios](#preparing-the-windows-vm-for-the-scenarios)
 - [Scenarios](#scenarios)
   - [Scenario 1: Easy – Unauthorized Remote Access via Backdoor](#scenario-1-easy--unauthorized-remote-access-via-backdoor)
-  - [Scenario 2: Medium – Exfiltrate Passwords from the local Database of the Webbrowser](#scenario-2-medium--exfiltrate-passwords-from-the-local-database-of-the-webbrowser)
-  - [Scenario 3: Hard - File Encryption (Ransomware-like Behavior)](#scenario-3-hard---file-encryption-ransomware-like-behavior)
-- [Expected Artifacts and Analysis](#expected-artifacts-and-analysis)
-- [Summary and Conclusion](#summary-and-conclusion)
-
-## Table of Contents
-
-- [Introduction](#introduction)
-- [Task Description](#task-description)
-- [Installation of Fortrace++](#installation-of-fortrace)
-  - [Kali Linux](#kali-linux)
-  - [EndeavourOS (Arch Linux)](#endeavouros-arch-linux)
-  - [Preparing the Windows ISO](#preparing-the-windows-iso)
-  - [Setting up the Windows VM](#setting-up-the-windows-vm)
-  - [Preparing the Windows VM for the Scenarios](#preparing-the-windows-vm-for-the-scenarios)
-- [Scenarios](#scenarios)
-  - [Scenario 1: Easy – Unauthorized Remote Access via Backdoor](#scenario-1-easy-unauthorized-remote-access-via-backdoor)
     - [Description](#description)
     - [Technical Implementation](#technical-implementation)
-    - [Configuration and Execution](#configuration-and-execution)
   - [Scenario 2: Medium – Exfiltrate Passwords from the Local Database of the Web Browser](#scenario-2-medium-exfiltrate-passwords-from-the-local-database-of-the-web-browser)
-    - [Description](#description-1)
     - [Technical Implementation](#technical-implementation-1)
-    - [Configuration and Execution](#configuration-and-execution-1)
-  - [Scenario 3: Hard – File Encryption (Ransomware-like Behavior)](#scenario-3-hard-file-encryption-ransomware-like-behavior)
-    - [Description](#description-2)
-    - [Technical Implementation](#technical-implementation-2)
-    - [Configuration and Execution](#configuration-and-execution-2)
+    - [ForTrace++ Automation Implementation](#fortrace-automation-implementation)
+    - [Security Implications & Countermeasures](#security-implications--countermeasures)
+    - [Outlook & Future Improvements](#outlook--future-improvements)
+  - [Scenario 3: Hard – File Encryption (Ransomware-like Behavior)](#scenario-3-hard---file-encryption-ransomware-like-behavior)
+    - [Environment and Preparation](#environment-and-preparation)
+    - [Encryption Implementation](#encryption-implementation)
 - [Expected Artifacts and Analysis](#expected-artifacts-and-analysis)
   - [Forensic Artifacts](#forensic-artifacts)
-  - [Network Traffic Analysis](#network-traffic-analysis)
-  - [Memory and Disk Analysis](#memory-and-disk-analysis)
-  - [Converting `.raw` to `.e01` for Analysis](#converting-raw-to-e01-for-analysis)
-- [General Troubleshooting](#general-troubleshooting)
+  - [Converting `.raw` to `.e01` on EndeavourOS](#converting-raw-to-e01-on-endeavouros)
 - [Summary and Conclusion](#summary-and-conclusion)
-  - [Evaluation of Fortrace++](#evaluation-of-fortrace)
-  - [Limitations and Possible Improvements](#limitations-and-possible-improvements)
-
-
+  - [Evaluation and Usability of ForTrace++](#evaluation-and-usability-of-fortrace)
+- [General Troubleshooting](#general-troubleshooting)
+- [Potential Improvements (To-Do) - Outlook](#potential-improvements-to-do---outlook)
 
 ---
 
@@ -427,7 +406,7 @@ This scenario simulates a simple case where a laptop is left unattended. An atta
 
 > **Note for the Network Dump**: The .pcap-File is created if the `start_sniffer` is set to `True`
 --- 
-**Technical Implementation**
+#### **Technical Implementation**
 
 - **Host System Preparation:**
   - Install netcat (or a similar tool) on the host system (e.g. using `sudo pacman -S netcat`)
@@ -1133,7 +1112,7 @@ python scenarios/scenario2-browser_password_exfiltration/scenario2.py
 4. **Monitor network traffic** for suspicious data exfiltration
 5. **Apply the principle of least privilege** for system access
 
-## **Outlook & Future Improvements**
+## Outlook & Future Improvements
 ### **Automating the Entire Process with ForTrace++**
 - Instead of manually **preparing saved credentials** on the VM, ForTrace++ can:
   - **Automate logging into websites** and selecting "Save Password."
@@ -1552,10 +1531,10 @@ ValueError: max() iterable argument is empty
 
 ## Potential Improvements (To-Do) - Outlook
 - modify the unattend.xml to automatically execute the PowerShell scripts
-  - allow the PowerShell Execution Policy
+  - allow the PowerShell Execution Policy [DONE]
   - automatic Install of the Windows SPICE Guest Tools
-  - deactivate Windows Defender already in the ISO, so the Malware Examples work without interruption
-- Development of Malware that is not already detected by Windows Defender by using obfuscation techniques.
+  - deactivate Windows Defender already in the ISO, so the Malware Examples work without interruption [DONE]
+- Development of Malware that is not already detected by Windows Defender by using obfuscation techniques. [PARTIALLY-DONE]
 - Further development of automation scripts to simulate even more realistic attack scenarios.
 - Incorporate additional steps into the scenario, such as using an email client to receive an email containing a Word document with a malicious macro.
 - Evaluation and comparison of results with real-world attack data.
