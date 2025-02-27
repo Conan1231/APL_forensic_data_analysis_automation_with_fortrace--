@@ -12,8 +12,8 @@ domain:
   os_type: OSType.WINDOWS
   desktop_env: DesktopEnvironmentType.Windows_10
   start_sniffer: False
-  snapshot: "clean_install"
-  dump_images: False
+  snapshot: "clean_install_vga"
+  dump_images: True
 explorer:
   path: 'C:\Users\fortrace\Desktop\'
 backdoor:

