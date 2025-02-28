@@ -29,6 +29,7 @@
   - [Evaluation and Usability of ForTrace++](#evaluation-and-usability-of-fortrace)
 - [General Troubleshooting](#general-troubleshooting)
 - [Potential Improvements (To-Do) - Outlook](#potential-improvements-to-do---outlook)
+- [AI Workflow for Creating Fortrace++ Scenarios](#ai-workflow-for-creating-fortrace-scenarios)
 
 ---
 
@@ -1539,3 +1540,57 @@ ValueError: max() iterable argument is empty
 - Incorporate additional steps into the scenario, such as using an email client to receive an email containing a Word document with a malicious macro.
 - Evaluation and comparison of results with real-world attack data.
 ---
+
+# AI Workflow for Creating Fortrace++ Scenarios
+
+Workflow for using AI to generate new scenarios for the Fortrace++ Project. By following this structured approach, it is possible to efficiently create custom simulation scenarios without having to write all the code manually.
+
+## Workflow Documentation
+
+### Step 1: Prepare Reference Materials
+
+Before engaging with the AI, gather relevant reference materials:
+
+1. **Fortrace Documentation Excerpts**: Collect snippets from the official Fortrace documentation that describe the classes and functions you plan to use.
+2. **Existing Scenario Examples**: Include at least one working scenario (.yaml and .py) to provide the AI with a concrete reference.
+3. **Attack Flow Description**: Prepare a clear description of the attack flow you want to simulate.
+
+### Step 2: Construct Your Prompt
+
+Structure your prompt to the AI as follows:
+
+```
+I need to create a new scenario for the Fortrace++ Project that simulates [brief description of the attack].
+
+### Fortrace Documentation References
+[Paste relevant documentation about classes/functions to be used]
+
+### Desired Attack Flow
+[Describe the attack process step by step, using either:
+- PowerShell commands that would achieve the goal
+- Plain language description of the attack stages
+- Specific Fortrace functions you want to utilize]
+
+### Example Scenario
+[Paste a working example scenario including both .yaml and .py files]
+
+Please generate:
+1. A complete scenario .yaml file with appropriate configuration
+2. A Python scenario .py file that implements the attack flow
+```
+
+### Step 3: Refine the Generated Scenario
+
+After receiving the AI-generated scenario:
+
+1. **Review the Generated Code**: Ensure the AI has correctly implemented all stages of the attack.
+2. **Validate Technical Accuracy**: Check that class names, method calls, and parameters match the Fortrace API.
+3. **Iterative Refinement**: If needed, ask the AI to correct specific parts by providing clear instructions about what needs to be modified.
+
+### Step 4: Implementation and Testing
+
+1. **Save Files**: Save the .yaml and .py files in the appropriate Fortrace++ directory structure.
+2. **Test Execution**: Run the scenario in a test environment to verify functionality.
+3. **Debugging**: If issues arise, collect error messages and ask the AI for debugging assistance.
+
+> **Note:** Tested by using [Claude 3.7 Sonnet](https://claude.ai)
